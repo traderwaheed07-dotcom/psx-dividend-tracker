@@ -1,0 +1,40 @@
+name: Update dividend data
+
+on:
+  schedule:
+    - cron: "30 2 * * *"   # 07:30 PKT
+    - cron: "30 11 * * *"  # 16:30 PKT (after market close)
+  workflow_dispatch:        # manual "Run workflow" button
+
+permissions:
+  contents: write
+
+concurrency:
+  group: update-data
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Fetch latest dividends
+        run: python scripts/update_data.py
+
+      - name: Commit if data changed
+        run: |
+          if git diff --quiet -- data.json; then
+            echo "Nothing to commit."
+            exit 0
+          fi
+          git config user.name "psx-dividend-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add data.json
+          git commit -m "Update dividend data $(date -u +%Y-%m-%d)"
+          git push
