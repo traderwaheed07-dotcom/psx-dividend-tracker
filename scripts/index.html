@@ -1,0 +1,477 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>PSX Dividend Tracker</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+/* Layout: summary header, searchable ex-date list on the left, selected share's payout history on the right (stacks on phones). */
+:root{
+  --bg:#f3f5f4;
+  --surface:#ffffff;
+  --ink:#16221f;
+  --muted:#5b6b66;
+  --line:#d9e0dd;
+  --accent:#0d5c4a;
+  --accent-ink:#ffffff;
+  --accent-soft:#dcebe6;
+  --warn:#9a5b00;
+  --warn-soft:#fbecd0;
+  --past:#6b7773;
+  --past-soft:#e8ecea;
+  --f-display:"Bricolage Grotesque","Segoe UI",system-ui,sans-serif;
+  --f-body:"IBM Plex Sans","Segoe UI",system-ui,sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0f1715;--surface:#17211e;--ink:#e6efec;--muted:#92a39d;--line:#2a3733;
+    --accent:#4fc2a3;--accent-ink:#06201a;--accent-soft:#1c3a32;
+    --warn:#f0b455;--warn-soft:#3a2d12;--past:#8d9b96;--past-soft:#232e2b;
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0f1715;--surface:#17211e;--ink:#e6efec;--muted:#92a39d;--line:#2a3733;
+  --accent:#4fc2a3;--accent-ink:#06201a;--accent-soft:#1c3a32;
+  --warn:#f0b455;--warn-soft:#3a2d12;--past:#8d9b96;--past-soft:#232e2b;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+body{
+  background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.5;
+  padding-block:24px 48px;
+  padding-left:max(16px,env(safe-area-inset-left,0px));
+  padding-right:max(16px,env(safe-area-inset-right,0px));
+}
+.wrap{max-width:1120px;margin:0 auto}
+header{display:flex;flex-wrap:wrap;gap:12px 24px;align-items:flex-end;justify-content:space-between;margin-bottom:20px}
+h1{font-family:var(--f-display);font-weight:700;font-size:clamp(26px,4.5vw,38px);line-height:1.05;margin:0;letter-spacing:-.01em;text-wrap:balance}
+.sub{color:var(--muted);margin:6px 0 0;max-width:60ch}
+.asof{text-align:right;font-family:var(--f-mono);font-variant-numeric:tabular-nums}
+.asof .clk{display:block;font-size:28px;font-weight:600;line-height:1.1;color:var(--ink)}
+.asof .dt{display:block;font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-top:2px}
+.summary{display:flex;flex-wrap:wrap;gap:8px 28px;padding:14px 0;border-block:1px solid var(--line);margin-bottom:20px}
+.summary div{min-width:0}
+.summary b{display:block;font-family:var(--f-mono);font-size:22px;font-weight:600;font-variant-numeric:tabular-nums}
+.summary span{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+.grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.1fr);gap:20px;align-items:start}
+@media (max-width:820px){.grid{grid-template-columns:minmax(0,1fr)}}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:10px;min-width:0}
+.tools{display:flex;flex-wrap:wrap;gap:8px;padding:12px;border-bottom:1px solid var(--line)}
+.tools input[type=search]{flex:1 1 160px;min-width:0;font:inherit;padding:8px 10px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--ink)}
+.seg{display:flex;border:1px solid var(--line);border-radius:6px;overflow:hidden}
+.seg button{font:inherit;font-size:13px;padding:8px 10px;border:0;background:transparent;color:var(--muted);cursor:pointer}
+.seg button[aria-pressed=true]{background:var(--accent);color:var(--accent-ink)}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.list{list-style:none;margin:0;padding:0}
+.row{width:100%;display:grid;grid-template-columns:76px minmax(0,1fr) auto;gap:2px 12px;align-items:center;text-align:left;font:inherit;color:inherit;background:transparent;border:0;border-bottom:1px solid var(--line);padding:11px 12px;cursor:pointer}
+.row:hover{background:var(--bg)}
+.row[aria-current=true]{background:var(--accent-soft)}
+.sym{font-family:var(--f-mono);font-weight:600;font-size:15px}
+.nm{color:var(--muted);font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.amt{font-family:var(--f-mono);font-weight:600;text-align:right;font-variant-numeric:tabular-nums}
+.meta{grid-column:2 / 4;display:flex;flex-wrap:wrap;gap:6px 10px;align-items:center;font-size:12px;color:var(--muted)}
+.pill{display:inline-block;font-size:11px;font-weight:600;padding:1px 8px;border-radius:99px;background:var(--accent-soft);color:var(--accent);text-transform:uppercase;letter-spacing:.04em}
+.pill.today{background:var(--warn-soft);color:var(--warn)}
+.pill.past{background:var(--past-soft);color:var(--past)}
+.tag{font-size:11px;border:1px solid var(--line);border-radius:4px;padding:0 5px;color:var(--muted)}
+.empty{padding:20px 14px;color:var(--muted)}
+.detail{padding:16px}
+.detail h2{font-family:var(--f-display);font-size:26px;margin:0;line-height:1.1}
+.detail .full{color:var(--muted);margin:2px 0 14px}
+.facts{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-bottom:16px}
+.fact{border:1px solid var(--line);border-radius:8px;padding:9px 11px;min-width:0}
+.fact span{display:block;font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+.fact b{font-family:var(--f-mono);font-size:17px;font-variant-numeric:tabular-nums}
+h3{font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin:18px 0 8px;font-weight:600}
+.chart{width:100%;height:auto;display:block}
+.chart .bar{fill:var(--accent)}
+.chart .bar.next{fill:var(--warn)}
+.chart text{fill:var(--muted);font-family:var(--f-mono);font-size:10px}
+.chart .grid-l{stroke:var(--line);stroke-width:1}
+.tablewrap{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-variant-numeric:tabular-nums}
+th{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);text-align:left;font-weight:600;padding:6px 8px;border-bottom:1px solid var(--line);white-space:nowrap}
+td{padding:7px 8px;border-bottom:1px solid var(--line);font-family:var(--f-mono);font-size:13px;white-space:nowrap}
+td.r,th.r{text-align:right}
+tr.up td{background:var(--warn-soft)}
+.note{font-size:13px;color:var(--muted);border-left:3px solid var(--line);padding:2px 0 2px 10px;margin:14px 0 0}
+.tools select{font:inherit;font-size:13px;padding:8px 8px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--ink)}
+.dh{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.star{font:inherit;font-size:13px;font-weight:600;padding:6px 12px;border-radius:99px;border:1px solid var(--line);background:transparent;color:var(--muted);cursor:pointer}
+.star[aria-pressed=true]{background:var(--warn-soft);color:var(--warn);border-color:var(--warn)}
+.dact{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.share{display:inline-block;text-decoration:none;font-size:13px;padding:6px 12px;border-radius:99px}
+.up-t{color:var(--accent)}.dn-t{color:var(--warn)}
+.calc{display:flex;flex-wrap:wrap;gap:10px 12px;align-items:end}
+.calc label{display:flex;flex-direction:column;gap:3px;font-size:12px;color:var(--muted)}
+.calc input[type=number],.calc select{font:inherit;padding:7px 9px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--ink);width:150px;max-width:100%}
+.calc .chk{flex-direction:row;align-items:center;gap:6px;padding-bottom:8px;font-size:13px;color:var(--ink)}
+.taxsel{display:flex;flex-wrap:wrap;gap:4px 16px}
+.cout{flex:1 1 100%;display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px;margin-top:4px}
+.cout div{border:1px solid var(--line);border-radius:8px;padding:8px 10px;min-width:0}
+.cout span{display:block;font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+.cout b{font-family:var(--f-mono);font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.cout .net{background:var(--accent-soft)}
+#cal{padding:12px}
+.calhead{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;font-family:var(--f-display);font-size:18px}
+.calnav{font:inherit;font-size:18px;width:34px;height:34px;border-radius:6px;border:1px solid var(--line);background:transparent;color:var(--ink);cursor:pointer}
+.calgrid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:3px}
+.dow{font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);text-align:center;padding:2px 0}
+.cell{min-height:64px;border:1px solid var(--line);border-radius:6px;padding:3px;display:flex;flex-direction:column;gap:2px;min-width:0;overflow:hidden}
+.cell.off{border-color:transparent}
+.cell.wkend{background:var(--bg)}
+.cell.today{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent)}
+.dn{font-family:var(--f-mono);font-size:11px;color:var(--muted)}
+.cell.today .dn{color:var(--accent);font-weight:600}
+.chip{font:inherit;font-family:var(--f-mono);font-size:10px;font-weight:600;padding:1px 3px;border:0;border-radius:3px;background:var(--accent-soft);color:var(--accent);cursor:pointer;text-align:left;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+.chip[aria-current=true]{background:var(--accent);color:var(--accent-ink)}
+.calnote{font-size:12px;color:var(--muted);margin:10px 0 0}
+.addform{display:flex;flex-wrap:wrap;gap:8px;align-items:end;margin-top:10px}
+.addform label{display:flex;flex-direction:column;font-size:12px;color:var(--muted);gap:3px}
+.addform input{font:inherit;padding:7px 9px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--ink);width:150px;max-width:100%}
+.btn{font:inherit;font-weight:600;padding:8px 14px;border-radius:6px;border:0;background:var(--accent);color:var(--accent-ink);cursor:pointer}
+.btn.ghost{background:transparent;color:var(--muted);border:1px solid var(--line);font-weight:500;padding:3px 8px;font-size:12px}
+.owner{position:relative;overflow:hidden;display:flex;flex-wrap:wrap;align-items:center;gap:14px 24px;padding:18px 20px;margin-bottom:20px;border-radius:14px;color:#fff;
+  background:linear-gradient(120deg,#073b30 0%,#0d5c4a 55%,#1a8a6e 100%);box-shadow:0 6px 22px rgba(7,59,48,.28)}
+.owner::after{content:"";position:absolute;right:-40px;top:-60px;width:200px;height:200px;border-radius:50%;background:rgba(255,255,255,.07);pointer-events:none}
+.owner .badge{flex:none;width:58px;height:58px;border-radius:50%;display:grid;place-items:center;font-family:var(--f-display);font-weight:700;font-size:22px;letter-spacing:.02em;color:#073b30;background:#f5c451;box-shadow:0 0 0 3px rgba(255,255,255,.35)}
+.owner .id{min-width:0;margin-right:auto;position:relative;z-index:1}
+.owner .by{font-size:11px;text-transform:uppercase;letter-spacing:.14em;color:#f5c451;font-weight:600}
+.owner .who{font-family:var(--f-display);font-weight:700;font-size:clamp(28px,6vw,40px);line-height:1.05;letter-spacing:-.01em;margin:2px 0 0}
+.owner .chips{display:flex;flex-wrap:wrap;gap:8px;position:relative;z-index:1}
+.owner .c{display:flex;flex-direction:column;gap:1px;min-width:0;overflow-wrap:anywhere;padding:7px 12px;border-radius:10px;background:rgba(255,255,255,.13);border:1px solid rgba(255,255,255,.22)}
+.owner .c span{font-size:10px;text-transform:uppercase;letter-spacing:.1em;color:#f5c451;font-weight:600}
+.owner a{color:#fff;text-decoration:none;font-weight:500}
+.owner a:hover{text-decoration:underline}
+.owner .mono{font-family:var(--f-mono);font-size:14px}
+footer{margin-top:24px;font-size:12px;color:var(--muted);max-width:90ch}
+footer a{color:var(--accent)}
+@media (prefers-reduced-motion:no-preference){.row{transition:background .12s}}
+</style>
+
+<div class="wrap">
+  <div class="owner">
+    <div class="badge" aria-hidden="true">WA</div>
+    <div class="id"><div class="by">Developed by</div><div class="who">Waheed Ali</div></div>
+    <div class="chips">
+      <div class="c"><span>WhatsApp</span><a class="mono" href="https://wa.me/923710245152" target="_blank" rel="noopener">03710245152</a></div>
+      <div class="c"><span>Email</span><a class="mono" href="mailto:waheed.ali@js.com">waheed.ali@js.com</a></div>
+    </div>
+  </div>
+  <header>
+    <div>
+      <h1>PSX Dividend Tracker</h1>
+      <p class="sub">All upcoming ex-dates in one place. Click any share to see the dividends it has paid before.</p>
+    </div>
+    <div class="asof" id="asof"></div>
+  </header>
+
+  <div class="summary" id="summary"></div>
+
+  <div class="grid">
+    <section class="panel" aria-label="Upcoming dividends">
+      <div class="tools">
+        <input type="search" id="q" placeholder="Search symbol or company" aria-label="Search symbol or company">
+        <div class="seg" role="group" aria-label="Filter">
+          <button type="button" data-f="all" aria-pressed="true">All</button>
+          <button type="button" data-f="kmi" aria-pressed="false">Shariah</button>
+          <button type="button" data-f="hist" aria-pressed="false">Has history</button>
+          <button type="button" data-f="watch" aria-pressed="false">★ Watchlist</button>
+        </div>
+        <select id="sort" aria-label="Sort list">
+          <option value="date">Sort: Ex-date</option>
+          <option value="amt">Sort: Highest amount</option>
+          <option value="sym">Sort: Symbol A-Z</option>
+        </select>
+        <div class="seg" role="group" aria-label="View">
+          <button type="button" data-v="list" aria-pressed="true">List</button>
+          <button type="button" data-v="cal" aria-pressed="false">Calendar</button>
+        </div>
+      </div>
+      <ul class="list" id="list"></ul>
+      <div id="cal" hidden></div>
+    </section>
+
+    <section class="panel detail" id="detail" aria-live="polite"></section>
+  </div>
+
+  <footer>
+    <span id="upd"></span>Upcoming ex-dates and amounts come from <a href="https://psxterminal.com/dividends" target="_blank" rel="noopener">PSX Terminal</a> (not affiliated with PSX). Past history is currently included only for FFC and HUBC, from
+    <a href="https://stockanalysis.com/quote/psx/FFC/dividend" target="_blank" rel="noopener">StockAnalysis</a>. Book closure dates are not in this data. Confirm on the PSX
+    <a href="https://dps.psx.com.pk/payouts" target="_blank" rel="noopener">Payouts</a> page before trading. "Last day to buy" is the weekday before the ex-date and does not account for public holidays. Calculator tax rates follow
+    <a href="https://bacoconsultants.com/blogs/tax-on-dividend-income-pakistan-2026-section-150-rates" target="_blank" rel="noopener">a 2026 Section 150 summary</a>; your CDC statement shows the actual deduction. This is not investment advice.
+  </footer>
+</div>
+
+<script>
+/* ---------- Data ---------- */
+// Ex-date (X-date) = pehla trading din jis par share dividend ke baghair trade hota hai.
+var UP = [], HIST = {}, UPDATED = "";
+
+/* ---------- Helpers ---------- */
+function today(){var t=new Date();return new Date(t.getFullYear(),t.getMonth(),t.getDate());}
+function parse(s){var p=s.split("-");return new Date(+p[0],+p[1]-1,+p[2]);}
+function daysTo(s){return Math.round((parse(s)-today())/86400000);}
+var MON=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+function fmtDate(s){if(!s)return "–";var d=parse(s);return d.getDate()+" "+MON[d.getMonth()]+" "+d.getFullYear();}
+function fmtAmt(a){return "Rs "+(Math.round(a*100)/100).toFixed(2);}
+function esc(s){return String(s).replace(/[&<>"]/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c];});}
+function statusOf(s){
+  var n=daysTo(s);
+  if(n<0)return {t:"Passed",c:"past"};
+  if(n===0)return {t:"Ex-date today",c:"today"};
+  if(n===1)return {t:"Tomorrow",c:""};
+  return {t:"In "+n+" days",c:""};
+}
+
+var store={};
+var watch=[];
+try{watch=JSON.parse(localStorage.getItem("psx-div-watch")||"[]")||[];}catch(e){watch=[];}
+function saveW(){try{localStorage.setItem("psx-div-watch",JSON.stringify(watch));}catch(e){}}
+function isW(s){return watch.indexOf(s)>=0;}
+
+/* Full history for a symbol: built-in rows + rows the viewer added, newest first. */
+function historyFor(sym){
+  var rows=(HIST[sym]||[]).map(function(r){return {d:r[0],a:r[1],rec:r[2],pay:r[3],mine:false};});
+  (store[sym]||[]).forEach(function(r,i){rows.push({d:r.d,a:r.a,rec:"",pay:"",mine:true,i:i});});
+  rows.sort(function(x,y){return x.d<y.d?1:-1;});
+  return rows;
+}
+
+/* ---------- New helpers: buy-by date, money format, calculator state ---------- */
+var DOW=["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
+var MONF=["January","February","March","April","May","June","July","August","September","October","November","December"];
+function pad2(n){return String(n).padStart(2,"0");}
+function lastBuy(s){ // previous weekday before the ex-date (PSX is closed Sat/Sun)
+  var d=parse(s);
+  do{d=new Date(d.getFullYear(),d.getMonth(),d.getDate()-1);}while(d.getDay()===0||d.getDay()===6);
+  return d.getFullYear()+"-"+pad2(d.getMonth()+1)+"-"+pad2(d.getDate());
+}
+function fmtShort(s){var d=parse(s);return DOW[d.getDay()]+" "+d.getDate()+" "+MON[d.getMonth()];}
+function money(x){return "Rs "+x.toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2});}
+var calcShares=1000, calcStatus="f", ippMap={};
+var view="list", calY=null, calM=null;
+
+/* ---------- State ---------- */
+var sel="FFC", filter="all", query="", sortBy="date";
+
+/* ---------- Render ---------- */
+function renderSummary(){
+  var upcoming=UP.filter(function(u){return daysTo(u.d)>=0;});
+  var tdy=UP.filter(function(u){return daysTo(u.d)===0;}).length;
+  var wk=UP.filter(function(u){var n=daysTo(u.d);return n>=0&&n<=7;}).length;
+  var withHist=UP.filter(function(u){return historyFor(u.s).length>0;}).length;
+  document.getElementById("summary").innerHTML=
+    '<div><b>'+upcoming.length+'</b><span>Upcoming payouts</span></div>'+
+    '<div><b>'+tdy+'</b><span>Ex-date today</span></div>'+
+    '<div><b>'+wk+'</b><span>Next 7 days</span></div>'+
+    '<div><b>'+withHist+' / '+UP.length+'</b><span>With history</span></div>';
+}
+/* Live clock in Pakistan time (PSX trades in PKT). Re-renders statuses when the date rolls over. */
+var lastDay=todayStr();
+function tick(){
+  var now=new Date(), el=document.getElementById("asof");
+  var d=now.toLocaleDateString("en-GB",{timeZone:"Asia/Karachi",weekday:"short",day:"numeric",month:"short",year:"numeric"});
+  var t=now.toLocaleTimeString("en-GB",{timeZone:"Asia/Karachi",hour:"2-digit",minute:"2-digit",second:"2-digit",hour12:false});
+  el.innerHTML='<span class="clk">'+t+'</span><span class="dt">'+d+' · PKT</span>';
+  var td=todayStr();
+  if(td!==lastDay){lastDay=td;renderAll();}
+}
+function todayStr(){var t=today();return t.getFullYear()+"-"+String(t.getMonth()+1).padStart(2,"0")+"-"+String(t.getDate()).padStart(2,"0");}
+
+function passesFilter(u){
+  var q=query.trim().toLowerCase();
+  if(filter==="kmi"&&!u.k)return false;
+  if(filter==="hist"&&!historyFor(u.s).length)return false;
+  if(filter==="watch"&&!isW(u.s))return false;
+  if(q&&(u.s.toLowerCase().indexOf(q)<0&&u.n.toLowerCase().indexOf(q)<0))return false;
+  return true;
+}
+function renderCal(){
+  var el=document.getElementById("cal"), t=today();
+  if(calY===null){calY=t.getFullYear();calM=t.getMonth();}
+  var first=new Date(calY,calM,1), dim=new Date(calY,calM+1,0).getDate(), lead=(first.getDay()+6)%7;
+  var map={}, count=0;
+  UP.filter(passesFilter).forEach(function(u){
+    var d=parse(u.d);
+    if(d.getFullYear()===calY&&d.getMonth()===calM){(map[d.getDate()]=map[d.getDate()]||[]).push(u);count++;}
+  });
+  var h='<div class="calhead"><button type="button" class="calnav" data-n="-1" aria-label="Previous month">‹</button><b>'+MONF[calM]+' '+calY+'</b><button type="button" class="calnav" data-n="1" aria-label="Next month">›</button></div><div class="calgrid">';
+  ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"].forEach(function(d){h+='<div class="dow">'+d+'</div>';});
+  for(var i=0;i<lead;i++)h+='<div class="cell off"></div>';
+  for(var day=1;day<=dim;day++){
+    var dt=new Date(calY,calM,day), wk=dt.getDay()===0||dt.getDay()===6;
+    h+='<div class="cell'+(wk?' wkend':'')+(dt.getTime()===t.getTime()?' today':'')+'"><span class="dn">'+day+'</span>';
+    (map[day]||[]).forEach(function(u){h+='<button type="button" class="chip" data-s="'+u.s+'" aria-current="'+(u.s===sel)+'" title="'+u.s+' '+fmtAmt(u.a)+'">'+u.s+'</button>';});
+    h+='</div>';
+  }
+  h+='</div><p class="calnote">'+count+' ex-date'+(count===1?'':'s')+' this month. Tap a symbol for details. Shaded days are weekends (PSX closed).</p>';
+  el.innerHTML=h;
+}
+function renderList(){
+  if(view==="cal"){document.getElementById("list").hidden=true;document.getElementById("cal").hidden=false;renderCal();return;}
+  document.getElementById("list").hidden=false;document.getElementById("cal").hidden=true;
+  var q=query.trim().toLowerCase();
+  var items=UP.filter(function(u){
+    if(filter==="kmi"&&!u.k)return false;
+    if(filter==="hist"&&!historyFor(u.s).length)return false;
+    if(filter==="watch"&&!isW(u.s))return false;
+    if(q&&(u.s.toLowerCase().indexOf(q)<0&&u.n.toLowerCase().indexOf(q)<0))return false;
+    return true;
+  });
+  items.sort(function(a,b){
+    if(sortBy==="amt")return b.a-a.a;
+    if(sortBy==="sym")return a.s<b.s?-1:1;
+    return a.d<b.d?-1:a.d>b.d?1:(a.s<b.s?-1:1);
+  });
+  var el=document.getElementById("list");
+  if(!items.length){el.innerHTML='<li class="empty">No shares found. Try a different search or filter.</li>';return;}
+  el.innerHTML=items.map(function(u){
+    var st=statusOf(u.d), hc=historyFor(u.s).length;
+    return '<li><button type="button" class="row" data-s="'+u.s+'" aria-current="'+(u.s===sel)+'">'+
+      '<span class="sym">'+u.s+'</span><span class="nm">'+esc(u.n||"")+'</span><span class="amt">'+fmtAmt(u.a)+'</span>'+
+      '<span class="meta"><span class="pill '+st.c+'">'+st.t+'</span><span>Ex-date '+fmtDate(u.d)+'</span><span>Buy by '+fmtShort(lastBuy(u.d))+(lastBuy(u.d)<todayStr()?' (passed)':'')+'</span>'+
+      (u.k?'<span class="tag">Shariah</span>':'')+
+      (hc?'<span class="tag">'+hc+' past payouts</span>':'')+'</span></button></li>';
+  }).join("");
+}
+
+function chartSVG(rows,next){
+  // oldest to newest, last 12 payouts, plus the upcoming one highlighted
+  var past=rows.filter(function(r){return r.d<=todayStr();}).slice(0,12).reverse();
+  var bars=past.map(function(r){return {l:r.d,a:r.a,n:false};});
+  if(next)bars.push({l:next.d,a:next.a,n:true});
+  if(bars.length<2)return "";
+  var W=560,H=190,pl=40,pr=8,pt=14,pb=34;
+  var max=Math.max.apply(null,bars.map(function(b){return b.a;}));
+  var top=niceMax(max);
+  var bw=(W-pl-pr)/bars.length, g='';
+  for(var i=0;i<=4;i++){
+    var v=top*i/4, y=pt+(H-pt-pb)*(1-i/4);
+    g+='<line class="grid-l" x1="'+pl+'" x2="'+(W-pr)+'" y1="'+y+'" y2="'+y+'"/><text x="'+(pl-6)+'" y="'+(y+3)+'" text-anchor="end">'+trim(v)+'</text>';
+  }
+  bars.forEach(function(b,i){
+    var h=(H-pt-pb)*(b.a/top), x=pl+i*bw+bw*0.18, w=bw*0.64, y=H-pb-h;
+    g+='<rect class="bar'+(b.n?' next':'')+'" x="'+x+'" y="'+y+'" width="'+w+'" height="'+h+'" rx="2"><title>'+fmtDate(b.l)+': '+fmtAmt(b.a)+'</title></rect>';
+    if(bars.length<=14||i%2===0){
+      var d=parse(b.l);
+      g+='<text x="'+(x+w/2)+'" y="'+(H-pb+13)+'" text-anchor="middle">'+MON[d.getMonth()]+'</text><text x="'+(x+w/2)+'" y="'+(H-pb+25)+'" text-anchor="middle">'+String(d.getFullYear()).slice(2)+'</text>';
+    }
+  });
+  return '<svg class="chart" viewBox="0 0 '+W+' '+H+'" role="img" aria-label="Amount of each payout, oldest to newest">'+g+'</svg>';
+}
+function niceMax(m){var p=Math.pow(10,Math.floor(Math.log10(m))),f=m/p;var n=f<=1?1:f<=2?2:f<=2.5?2.5:f<=5?5:10;return n*p;}
+function trim(v){return (Math.round(v*100)/100).toString();}
+
+function renderDetail(){
+  var el=document.getElementById("detail");
+  var u=UP.filter(function(x){return x.s===sel;})[0];
+  if(!u){el.innerHTML='<p class="empty">Select a share from the list.</p>';return;}
+  var rows=historyFor(u.s), st=statusOf(u.d), lb=lastBuy(u.d);
+  var msg='PSX Dividend: '+u.s+(u.n?' ('+u.n+')':'')+' - '+fmtAmt(u.a)+' per share. Ex-date: '+fmtDate(u.d)+'. Last day to buy: '+fmtShort(lb)+'. Via PSX Dividend Tracker by Waheed Ali.';
+  var ts=todayStr(), yago=(function(){var t=today();return new Date(t.getFullYear()-1,t.getMonth(),t.getDate());})();
+  var past=rows.filter(function(r){return r.d<=ts;});
+  var last=past[0];
+  var ttm=past.filter(function(r){return parse(r.d)>yago;}).reduce(function(s,r){return s+r.a;},0);
+  var h='<div class="dh"><h2>'+u.s+'</h2><div class="dact"><button type="button" class="star" id="starbtn" aria-pressed="'+isW(u.s)+'">'+(isW(u.s)?'★ Watching':'☆ Watch')+'</button>'+
+     '<a class="btn share" target="_blank" rel="noopener" href="https://wa.me/?text='+encodeURIComponent(msg)+'">Share on WhatsApp</a></div></div><p class="full">'+esc(u.n||"Company name not in this data")+'</p>';
+  h+='<div class="facts">'+
+     '<div class="fact"><span>Upcoming</span><b>'+fmtAmt(u.a)+'</b></div>'+
+     '<div class="fact"><span>Ex-date</span><b>'+fmtDate(u.d)+'</b></div>'+
+     '<div class="fact"><span>Status</span><b>'+st.t+'</b></div>'+
+     '<div class="fact"><span>Last day to buy</span><b>'+fmtShort(lb)+(lb<ts?' ✕':'')+'</b></div>'+
+     (past.length?'<div class="fact"><span>Last payout</span><b>'+fmtAmt(last.a)+'</b></div>'+
+     '<div class="fact"><span>vs last payout</span><b class="'+(u.a>last.a?'up-t':u.a<last.a?'dn-t':'')+'">'+
+       (u.a>last.a?'▲ +':u.a<last.a?'▼ ':'= Same ')+(u.a===last.a?'':(Math.round((u.a-last.a)/last.a*1000)/10)+'%')+'</b></div>'+
+     '<div class="fact"><span>Last 12 months</span><b>'+fmtAmt(ttm)+'</b></div>':'')+
+     '</div>';
+  if(rows.length){
+    h+='<h3>Each payout (Rs per share)</h3>'+chartSVG(rows,u);
+    h+='<h3>Past record</h3><div class="tablewrap"><table><thead><tr><th>Ex-date</th><th class="r">Amount</th><th>Record</th><th>Payment</th><th></th></tr></thead><tbody>';
+    h+='<tr class="up"><td>'+fmtDate(u.d)+'</td><td class="r">'+fmtAmt(u.a)+'</td><td>–</td><td>–</td><td>Upcoming</td></tr>';
+    rows.forEach(function(r){
+      h+='<tr><td>'+fmtDate(r.d)+'</td><td class="r">'+fmtAmt(r.a)+'</td><td>'+fmtDate(r.rec)+'</td><td>'+fmtDate(r.pay)+'</td><td></td></tr>';
+    });
+    h+='</tbody></table></div>';
+  }else{
+    h+='<h3>Past record</h3><p class="note">Past dividend history for '+u.s+' is not available in this app yet. Check the PSX Payouts page for its earlier payouts.</p>';
+  }
+  h+='<h3>Dividend calculator</h3><div class="calc">'+
+     '<label>Number of shares<input type="number" id="cshares" min="0" step="1" inputmode="numeric" value="'+calcShares+'"></label>'+
+     '<div class="taxsel" role="radiogroup" aria-label="Tax status">'+
+       '<label class="chk"><input type="radio" name="ctax" value="f"> Filer (<span id="rf">15</span>% tax)</label>'+
+       '<label class="chk"><input type="radio" name="ctax" value="n"> Non-filer (<span id="rn">30</span>% tax)</label></div>'+
+     '<label class="chk"><input type="checkbox" id="cipp"> IPP rate</label>'+
+     '<div class="cout" id="cout"></div></div>'+
+     '<p class="note">Rates: filer 15%, non-filer 30%; IPPs 7.5% / 15%. Tick IPP only if the paying company is an independent power producer (HUBC is pre-ticked). Companies paying no tax can face higher rates.</p>';
+  el.innerHTML=h;
+  var cs=document.getElementById("cshares"), cip=document.getElementById("cipp");
+  var radios=el.querySelectorAll('input[name=ctax]');
+  Array.prototype.forEach.call(radios,function(r){r.checked=(r.value===calcStatus);});
+  cip.checked=(ippMap[u.s]!==undefined)?ippMap[u.s]:(u.s==="HUBC");
+  function calcOut(){
+    var n=parseFloat(cs.value)||0; calcShares=cs.value===""?"":n; ippMap[u.s]=cip.checked;
+    calcStatus=el.querySelector('input[name=ctax]:checked').value;
+    var rf=cip.checked?7.5:15, rn=cip.checked?15:30;
+    document.getElementById("rf").textContent=rf; document.getElementById("rn").textContent=rn;
+    var rate=calcStatus==="f"?rf:rn;
+    var gross=n*u.a, tax=gross*rate/100;
+    document.getElementById("cout").innerHTML=
+      '<div><span>Gross dividend</span><b>'+money(gross)+'</b></div>'+
+      '<div><span>Tax ('+rate+'%)</span><b>'+money(tax)+'</b></div>'+
+      '<div class="net"><span>You receive</span><b>'+money(gross-tax)+'</b></div>';
+  }
+  cs.addEventListener("input",calcOut);cip.addEventListener("change",calcOut);
+  Array.prototype.forEach.call(radios,function(r){r.addEventListener("change",calcOut);});
+  calcOut();
+  document.getElementById("starbtn").addEventListener("click",function(){
+    var i=watch.indexOf(sel);
+    if(i>=0)watch.splice(i,1);else watch.push(sel);
+    saveW();renderList();renderDetail();
+  });
+}
+
+function renderAll(){renderSummary();renderList();renderDetail();}
+
+document.getElementById("list").addEventListener("click",function(e){
+  var b=e.target.closest(".row");if(!b)return;
+  sel=b.getAttribute("data-s");renderList();renderDetail();
+  if(window.innerWidth<=820)document.getElementById("detail").scrollIntoView({behavior:"smooth",block:"start"});
+});
+document.getElementById("q").addEventListener("input",function(e){query=e.target.value;renderList();});
+document.getElementById("sort").addEventListener("change",function(e){sortBy=e.target.value;renderList();});
+Array.prototype.forEach.call(document.querySelectorAll("[data-v]"),function(b){
+  b.addEventListener("click",function(){
+    view=b.getAttribute("data-v");
+    Array.prototype.forEach.call(document.querySelectorAll("[data-v]"),function(x){x.setAttribute("aria-pressed",x===b);});
+    renderList();
+  });
+});
+document.getElementById("cal").addEventListener("click",function(e){
+  var n=e.target.closest(".calnav");
+  if(n){calM+=+n.getAttribute("data-n");if(calM<0){calM=11;calY--;}if(calM>11){calM=0;calY++;}renderCal();return;}
+  var c=e.target.closest(".chip");
+  if(c){sel=c.getAttribute("data-s");renderCal();renderDetail();
+    if(window.innerWidth<=820)document.getElementById("detail").scrollIntoView({behavior:"smooth",block:"start"});}
+});
+Array.prototype.forEach.call(document.querySelectorAll(".seg button"),function(b){
+  b.addEventListener("click",function(){
+    filter=b.getAttribute("data-f");
+    Array.prototype.forEach.call(document.querySelectorAll(".seg button"),function(x){x.setAttribute("aria-pressed",x===b);});
+    renderList();
+  });
+});
+tick();
+setInterval(tick,1000);
+fetch("data.json?v="+Date.now(),{cache:"no-store"}).then(function(r){if(!r.ok)throw new Error(r.status);return r.json();}).then(function(j){
+  UP=j.up||[];HIST=j.hist||{};UPDATED=j.updated||"";
+  if(UP.length&&!UP.some(function(u){return u.s===sel;}))sel=UP[0].s;
+  var f=document.getElementById("upd");
+  if(f&&UPDATED){f.textContent="Data last updated: "+new Date(UPDATED).toLocaleString("en-GB",{timeZone:"Asia/Karachi",day:"numeric",month:"short",year:"numeric",hour:"2-digit",minute:"2-digit"})+" PKT. ";}
+  renderAll();
+}).catch(function(){
+  document.getElementById("list").innerHTML='<li class="empty">Data load nahi ho saka. Page refresh karein.</li>';
+});
+</script>
+
+</body></html>
