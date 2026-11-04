@@ -146,6 +146,13 @@ tr.up td{background:var(--warn-soft)}
 .owner .mono{font-family:var(--f-mono);font-size:14px}
 footer{margin-top:24px;font-size:12px;color:var(--muted);max-width:90ch}
 footer a{color:var(--accent)}
+.updrow{display:flex;align-items:center;justify-content:flex-end;gap:10px;margin-top:8px;flex-wrap:wrap}
+.updrow .btn{padding:7px 14px;font-size:13px}
+.updrow .btn:disabled{opacity:.6;cursor:progress}
+#updmsg{font-family:var(--f-body);font-size:12px;color:var(--muted);max-width:320px;text-align:right}
+#updmsg.err{color:var(--warn)}
+#updbar{height:4px;width:100%;background:var(--line);border-radius:4px;overflow:hidden;margin-top:6px}
+#updbar i{display:block;height:100%;width:0;background:var(--accent);transition:width .2s}
 @media (prefers-reduced-motion:no-preference){.row{transition:background .12s}}
 </style>
 
@@ -163,7 +170,7 @@ footer a{color:var(--accent)}
       <h1>PSX Dividend Tracker</h1>
       <p class="sub">All upcoming ex-dates in one place. Click any share to see the dividends it has paid before.</p>
     </div>
-    <div class="asof" id="asof"></div>
+    <div><div class="asof" id="asof"></div><div class="updrow"><span id="updmsg"></span><button type="button" class="btn" id="updbtn">⟳ Update now</button></div><div id="updbar" hidden><i></i></div></div>
   </header>
 
   <div class="summary" id="summary"></div>
@@ -196,8 +203,8 @@ footer a{color:var(--accent)}
   </div>
 
   <footer>
-    <span id="upd"></span>Upcoming ex-dates and amounts come from <a href="https://psxterminal.com/dividends" target="_blank" rel="noopener">PSX Terminal</a> (not affiliated with PSX). Past history is currently included only for FFC and HUBC, from
-    <a href="https://stockanalysis.com/quote/psx/FFC/dividend" target="_blank" rel="noopener">StockAnalysis</a>. Book closure dates are not in this data. Confirm on the PSX
+    <span id="upd"></span>Upcoming ex-dates and amounts come from <a href="https://psxterminal.com/dividends" target="_blank" rel="noopener">PSX Terminal</a> (not affiliated with PSX). Past history comes from PSX Terminal when you press Update now (FFC and HUBC also keep earlier records from
+    <a href="https://stockanalysis.com/quote/psx/FFC/dividend" target="_blank" rel="noopener">StockAnalysis</a>). Book closure dates are not in this data. Confirm on the PSX
     <a href="https://dps.psx.com.pk/payouts" target="_blank" rel="noopener">Payouts</a> page before trading. "Last day to buy" is the weekday before the ex-date and does not account for public holidays. Calculator tax rates follow
     <a href="https://bacoconsultants.com/blogs/tax-on-dividend-income-pakistan-2026-section-150-rates" target="_blank" rel="noopener">a 2026 Section 150 summary</a>; your CDC statement shows the actual deduction. This is not investment advice.
   </footer>
@@ -461,13 +468,120 @@ Array.prototype.forEach.call(document.querySelectorAll(".seg button"),function(b
     renderList();
   });
 });
+/* ---------- Live update: runs in the visitor's own browser ---------- */
+var API="https://psxterminal.com/api", META={}, busy=false;
+function jget(p){
+  return fetch(API+p,{headers:{"Accept":"application/json"}}).then(function(r){
+    if(r.status===404)return null;
+    if(!r.ok)throw new Error("HTTP "+r.status);
+    return r.json();
+  });
+}
+function asList(j){
+  if(Array.isArray(j))return j;
+  if(j&&typeof j==="object"){
+    var ks=["data","dividends","result","results","items","payouts"];
+    for(var i=0;i<ks.length;i++){if(ks[i] in j){var v=asList(j[ks[i]]);if(v.length)return v;}}
+  }
+  return [];
+}
+function firstOf(o,keys){for(var i=0;i<keys.length;i++){var v=o[keys[i]];if(v!==undefined&&v!==null&&v!=="")return v;}return null;}
+function ymd(t){return t.getFullYear()+"-"+pad2(t.getMonth()+1)+"-"+pad2(t.getDate());}
+function nDate(v){
+  if(v===null||v===undefined)return "";
+  if(typeof v==="number")return ymd(new Date(v>1e11?v:v*1000));
+  var s=String(v).trim();
+  if(/^\d{4}-\d{2}-\d{2}/.test(s))return s.slice(0,10);
+  var m=s.match(/^(\d{1,2})[-\/](\d{1,2})[-\/](\d{4})$/);
+  if(m)return m[3]+"-"+pad2(m[2])+"-"+pad2(m[1]);
+  var t=new Date(s);return isNaN(t)?"":ymd(t);
+}
+function nAmt(v){
+  if(v===null||v===undefined)return null;
+  if(typeof v==="number")return v;
+  var n=parseFloat(String(v).replace(/Rs|,|%/g,"").trim());
+  return isNaN(n)?null:n;
+}
+function parseItem(it){
+  if(!it||typeof it!=="object")return null;
+  var ex=nDate(firstOf(it,["ex_date","exDate","ex_dividend_date","exDividendDate","xDate","x_date","date"]));
+  var amt=nAmt(firstOf(it,["amount","dividend","dividend_amount","dividendAmount","cash","cash_dividend","value"]));
+  if(!ex||amt===null||amt<=0)return null;
+  return {d:ex,a:Math.round(amt*10000)/10000,
+    rec:nDate(firstOf(it,["record_date","recordDate","book_closure","bookClosure","book_closure_from"])),
+    pay:nDate(firstOf(it,["payment_date","paymentDate","pay_date","payDate"]))};
+}
+function setMsg(t,err){var m=document.getElementById("updmsg");m.textContent=t;m.className=err?"err":"";}
+function setBar(p){var b=document.getElementById("updbar");b.hidden=(p===null);if(p!==null)b.firstChild.style.width=Math.round(p*100)+"%";}
+function showUpdated(iso){
+  var f=document.getElementById("upd");
+  if(f&&iso)f.textContent="Data last updated: "+new Date(iso).toLocaleString("en-GB",{timeZone:"Asia/Karachi",day:"numeric",month:"short",year:"numeric",hour:"2-digit",minute:"2-digit"})+" PKT. ";
+}
+function updateNow(){
+  if(busy)return; busy=true;
+  var btn=document.getElementById("updbtn"); btn.disabled=true; btn.textContent="Updating...";
+  setMsg("Symbols la raha hun..."); setBar(0);
+  var finish=function(){busy=false;btn.disabled=false;btn.textContent="⟳ Update now";setBar(null);};
+  var fail=function(e){
+    var net=(e&&e.name==="TypeError");
+    setMsg(net?"PSX Terminal se data nahi mil saka (internet ya browser block). Dobara try karein.":"Update nahi ho saka: "+(e&&e.message||e),true);
+    finish();
+  };
+  jget("/symbols").then(function(j){
+    var syms=asList(j).map(function(x){return typeof x==="string"?x:(x&&firstOf(x,["symbol","ticker","code","s"]));})
+      .filter(Boolean).map(function(s){return String(s).trim().toUpperCase();});
+    syms=syms.filter(function(s,i){return syms.indexOf(s)===i;}).sort();
+    if(syms.length<20)throw new Error("Symbols ki list theek nahi aayi");
+    var res={}, i=0, done=0, errs=0, stop=false, today=todayStr();
+    function worker(){
+      if(stop||i>=syms.length)return Promise.resolve();
+      var s=syms[i++];
+      return jget("/dividends/"+s).then(function(d){
+        res[s]=asList(d).map(parseItem).filter(Boolean);
+      }).catch(function(){errs++;}).then(function(){
+        done++; setBar(done/syms.length); setMsg(done+" / "+syms.length+" shares check ho gaye");
+        if(done>=15&&errs===done)stop=true;
+        return worker();
+      });
+    }
+    var ws=[];for(var k=0;k<8;k++)ws.push(worker());
+    return Promise.all(ws).then(function(){
+      if(stop)throw new TypeError("blocked");
+      if(errs>syms.length*0.3)throw new Error("Bohot saari requests fail hui ("+errs+"). Thori der baad try karein.");
+      var up=[],hist={},parsed=0,meta=META;
+      Object.keys(res).sort().forEach(function(s){
+        var items=res[s]; parsed+=items.length;
+        var fut=items.filter(function(x){return x.d>=today;}).sort(function(a,b){return a.d<b.d?-1:1;});
+        var rows={};
+        items.filter(function(x){return x.d<today;}).forEach(function(x){rows[x.d]=[x.d,x.a,x.rec,x.pay];});
+        (HIST[s]||[]).forEach(function(r){if(r[0]<today&&!rows[r[0]])rows[r[0]]=r;});
+        var keys=Object.keys(rows).sort().reverse().slice(0,60);
+        if(keys.length)hist[s]=keys.map(function(d){return rows[d];});
+        if(fut.length){var m=meta[s]||{n:"",k:0};meta[s]=m;up.push({s:s,n:m.n||"",d:fut[0].d,a:fut[0].a,k:m.k||0});}
+      });
+      if(!parsed)throw new Error("Koi dividend data parse nahi hua");
+      up.sort(function(a,b){return a.d<b.d?-1:a.d>b.d?1:(a.s<b.s?-1:1);});
+      UP=up;HIST=hist;UPDATED=new Date().toISOString();
+      try{localStorage.setItem("psx-div-data",JSON.stringify({up:UP,hist:HIST,meta:META,updated:UPDATED}));}catch(e){}
+      if(UP.length&&!UP.some(function(u){return u.s===sel;}))sel=UP[0].s;
+      showUpdated(UPDATED); renderAll();
+      setMsg("Update ho gaya: "+up.length+" upcoming payouts ("+syms.length+" shares check hue).");
+      finish();
+    });
+  }).catch(fail);
+}
+document.getElementById("updbtn").addEventListener("click",updateNow);
+
 tick();
 setInterval(tick,1000);
 fetch("data.json?v="+Date.now(),{cache:"no-store"}).then(function(r){if(!r.ok)throw new Error(r.status);return r.json();}).then(function(j){
-  UP=j.up||[];HIST=j.hist||{};UPDATED=j.updated||"";
+  UP=j.up||[];HIST=j.hist||{};UPDATED=j.updated||"";META=j.meta||{};
+  try{ // a newer update done in this browser wins over the published file
+    var s=JSON.parse(localStorage.getItem("psx-div-data")||"null");
+    if(s&&s.up&&Date.parse(s.updated)>Date.parse(UPDATED||0)){UP=s.up;HIST=s.hist||{};META=s.meta||META;UPDATED=s.updated;}
+  }catch(e){}
   if(UP.length&&!UP.some(function(u){return u.s===sel;}))sel=UP[0].s;
-  var f=document.getElementById("upd");
-  if(f&&UPDATED){f.textContent="Data last updated: "+new Date(UPDATED).toLocaleString("en-GB",{timeZone:"Asia/Karachi",day:"numeric",month:"short",year:"numeric",hour:"2-digit",minute:"2-digit"})+" PKT. ";}
+  showUpdated(UPDATED);
   renderAll();
 }).catch(function(){
   document.getElementById("list").innerHTML='<li class="empty">Data load nahi ho saka. Page refresh karein.</li>';
