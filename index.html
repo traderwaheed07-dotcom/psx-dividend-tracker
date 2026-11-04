@@ -180,6 +180,9 @@ footer a{color:var(--accent)}
 @media (prefers-reduced-motion:reduce){.ticker{overflow-x:auto}.ticker-track{animation:none}.ticker-set.dup{display:none}}
 .owner .cta{flex:1 1 100%;margin:0;font-size:14px;color:#e8f6f0;position:relative;z-index:1}
 .owner .cta b{color:#f5c451}
+.ownertools{margin-bottom:20px}
+.ownertools textarea{width:100%;min-height:110px;font:12px var(--f-mono);padding:10px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--ink);resize:vertical}
+#ownmsg{font-size:13px;color:var(--accent)}#ownmsg.err{color:var(--warn)}
 @media (prefers-reduced-motion:no-preference){.row{transition:background .12s}}
 </style>
 
@@ -205,6 +208,16 @@ footer a{color:var(--accent)}
   </header>
 
   <div class="summary" id="summary"></div>
+
+  <section class="panel ownertools" id="ownertools" hidden>
+    <div class="detail">
+      <h3 style="margin-top:0">Owner: update the data</h3>
+      <p class="note" style="margin-top:0">1. Open psxterminal.com/dividends, press Ctrl+A then Ctrl+C. 2. Paste it below. 3. Press &ldquo;Update from pasted text&rdquo;, then &ldquo;Publish for everyone&rdquo;.</p>
+      <textarea id="pastebox" placeholder="Paste the copied page text here"></textarea>
+      <div class="addform"><button type="button" class="btn" id="pasteok">Update from pasted text</button><button type="button" class="btn" id="pubbtn" disabled>Publish for everyone</button><button type="button" class="btn ghost" id="forgettok">Forget token</button><span id="ownmsg"></span></div>
+    </div>
+  </section>
+
 
   <div class="grid">
     <section class="panel" aria-label="Upcoming dividends">
@@ -234,7 +247,7 @@ footer a{color:var(--accent)}
   </div>
 
   <footer>
-    <span id="upd"></span>Upcoming ex-dates and amounts come from <a href="https://psxterminal.com/dividends" target="_blank" rel="noopener">PSX Terminal</a> (not affiliated with PSX). Past history comes from PSX Terminal when you press Update now (FFC and HUBC also keep earlier records from
+    <span id="upd"></span>Upcoming ex-dates and amounts come from <a href="https://psxterminal.com/dividends" target="_blank" rel="noopener">PSX Terminal</a> (not affiliated with PSX). Past history builds up as ex-dates pass (FFC and HUBC also keep earlier records from
     <a href="https://stockanalysis.com/quote/psx/FFC/dividend" target="_blank" rel="noopener">StockAnalysis</a>). Book closure dates are not in this data. Confirm on the PSX
     <a href="https://dps.psx.com.pk/payouts" target="_blank" rel="noopener">Payouts</a> page before trading. "Last day to buy" is the weekday before the ex-date and does not account for public holidays. Calculator tax rates follow
     <a href="https://bacoconsultants.com/blogs/tax-on-dividend-income-pakistan-2026-section-150-rates" target="_blank" rel="noopener">a 2026 Section 150 summary</a>; your CDC statement shows the actual deduction. This is not investment advice.
@@ -544,116 +557,98 @@ Array.prototype.forEach.call(document.querySelectorAll(".seg button"),function(b
     renderList();
   });
 });
-/* ---------- Live update: runs in the visitor's own browser ---------- */
-var API="https://psxterminal.com/api", META={}, busy=false;
-function jget(p){
-  return fetch(API+p,{headers:{"Accept":"application/json"}}).then(function(r){
-    if(r.status===404)return null;
-    if(!r.ok)throw new Error("HTTP "+r.status);
-    return r.json();
-  });
-}
-function asList(j){
-  if(Array.isArray(j))return j;
-  if(j&&typeof j==="object"){
-    var ks=["data","dividends","result","results","items","payouts"];
-    for(var i=0;i<ks.length;i++){if(ks[i] in j){var v=asList(j[ks[i]]);if(v.length)return v;}}
-  }
-  return [];
-}
-function firstOf(o,keys){for(var i=0;i<keys.length;i++){var v=o[keys[i]];if(v!==undefined&&v!==null&&v!=="")return v;}return null;}
-function ymd(t){return t.getFullYear()+"-"+pad2(t.getMonth()+1)+"-"+pad2(t.getDate());}
-function nDate(v){
-  if(v===null||v===undefined)return "";
-  if(typeof v==="number")return ymd(new Date(v>1e11?v:v*1000));
-  var s=String(v).trim();
-  if(/^\d{4}-\d{2}-\d{2}/.test(s))return s.slice(0,10);
-  var m=s.match(/^(\d{1,2})[-\/](\d{1,2})[-\/](\d{4})$/);
-  if(m)return m[3]+"-"+pad2(m[2])+"-"+pad2(m[1]);
-  var t=new Date(s);return isNaN(t)?"":ymd(t);
-}
-function nAmt(v){
-  if(v===null||v===undefined)return null;
-  if(typeof v==="number")return v;
-  var n=parseFloat(String(v).replace(/Rs|,|%/g,"").trim());
-  return isNaN(n)?null:n;
-}
-function parseItem(it){
-  if(!it||typeof it!=="object")return null;
-  var ex=nDate(firstOf(it,["ex_date","exDate","ex_dividend_date","exDividendDate","xDate","x_date","date"]));
-  var amt=nAmt(firstOf(it,["amount","dividend","dividend_amount","dividendAmount","cash","cash_dividend","value"]));
-  if(!ex||amt===null||amt<=0)return null;
-  return {d:ex,a:Math.round(amt*10000)/10000,
-    rec:nDate(firstOf(it,["record_date","recordDate","book_closure","bookClosure","book_closure_from"])),
-    pay:nDate(firstOf(it,["payment_date","paymentDate","pay_date","payDate"]))};
-}
+/* ---------- Data refresh + owner tools ---------- */
+var META={}, busy=false;
+var GH_API=window.PSX_GH_API||"https://api.github.com/repos/traderwaheed07-dotcom/psx-dividend-tracker/contents/data.json";
 function setMsg(t,err){var m=document.getElementById("updmsg");m.textContent=t;m.className=err?"err":"";}
-function setBar(p){var b=document.getElementById("updbar");b.hidden=(p===null);if(p!==null)b.firstChild.style.width=Math.round(p*100)+"%";}
 function showUpdated(iso){
   var f=document.getElementById("upd");
   if(f&&iso)f.textContent="Data last updated: "+new Date(iso).toLocaleString("en-GB",{timeZone:"Asia/Karachi",day:"numeric",month:"short",year:"numeric",hour:"2-digit",minute:"2-digit"})+" PKT. ";
 }
+/* "Update now": reload the data file published with the site. */
 function updateNow(){
   if(busy)return; busy=true;
   var btn=document.getElementById("updbtn"); btn.disabled=true; btn.textContent="Updating...";
-  setMsg("Fetching symbols..."); setBar(0);
-  var finish=function(){busy=false;btn.disabled=false;btn.textContent="⟳ Update now";setBar(null);};
-  var fail=function(e){
-    var net=(e&&e.name==="TypeError");
-    var why=net?"Live source is not reachable from this browser.":"Live update failed: "+(e&&e.message||e);
-    // Fallback: reload the data file published with the site (kept fresh from the owner's PC).
-    fetch("data.json?v="+Date.now(),{cache:"no-store"}).then(function(r){if(!r.ok)throw new Error(r.status);return r.json();}).then(function(j){
-      var pub=Date.parse(j.updated||0), cur=Date.parse(UPDATED||0);
-      if(!UP.length||pub>=cur||!cur){UP=j.up||[];HIST=j.hist||{};META=j.meta||META;UPDATED=j.updated||"";}
+  var done=function(){busy=false;btn.disabled=false;btn.textContent="⟳ Update now";};
+  fetch("data.json?v="+Date.now(),{cache:"no-store"}).then(function(r){if(!r.ok)throw new Error(r.status);return r.json();}).then(function(j){
+    var pub=Date.parse(j.updated||0), cur=Date.parse(UPDATED||0);
+    if(!UP.length||pub>cur){
+      UP=j.up||[];HIST=j.hist||{};META=j.meta||META;UPDATED=j.updated||"";
       if(UP.length&&!UP.some(function(u){return u.s===sel;}))sel=UP[0].s;
       showUpdated(UPDATED);renderAll();
-      setMsg(why+" Showing the latest published data.",true);
-    }).catch(function(){setMsg(why+" Please try again.",true);}).then(finish);
-  };
-  jget("/symbols").then(function(j){
-    var syms=asList(j).map(function(x){return typeof x==="string"?x:(x&&firstOf(x,["symbol","ticker","code","s"]));})
-      .filter(Boolean).map(function(s){return String(s).trim().toUpperCase();});
-    syms=syms.filter(function(s,i){return syms.indexOf(s)===i;}).sort();
-    if(syms.length<20)throw new Error("The symbol list looks wrong");
-    var res={}, i=0, done=0, errs=0, stop=false, today=todayStr();
-    function worker(){
-      if(stop||i>=syms.length)return Promise.resolve();
-      var s=syms[i++];
-      return jget("/dividends/"+s).then(function(d){
-        res[s]=asList(d).map(parseItem).filter(Boolean);
-      }).catch(function(){errs++;}).then(function(){
-        done++; setBar(done/syms.length); setMsg(done+" / "+syms.length+" shares checked");
-        if(done>=15&&errs===done)stop=true;
-        return worker();
-      });
-    }
-    var ws=[];for(var k=0;k<8;k++)ws.push(worker());
-    return Promise.all(ws).then(function(){
-      if(stop)throw new TypeError("blocked");
-      if(errs>syms.length*0.3)throw new Error("Too many requests failed ("+errs+"). Please try again later.");
-      var up=[],hist={},parsed=0,meta=META;
-      Object.keys(res).sort().forEach(function(s){
-        var items=res[s]; parsed+=items.length;
-        var fut=items.filter(function(x){return x.d>=today;}).sort(function(a,b){return a.d<b.d?-1:1;});
-        var rows={};
-        items.filter(function(x){return x.d<today;}).forEach(function(x){rows[x.d]=[x.d,x.a,x.rec,x.pay];});
-        (HIST[s]||[]).forEach(function(r){if(r[0]<today&&!rows[r[0]])rows[r[0]]=r;});
-        var keys=Object.keys(rows).sort().reverse().slice(0,60);
-        if(keys.length)hist[s]=keys.map(function(d){return rows[d];});
-        if(fut.length){var m=meta[s]||{n:"",k:0};meta[s]=m;up.push({s:s,n:m.n||"",d:fut[0].d,a:fut[0].a,k:m.k||0});}
-      });
-      if(!parsed)throw new Error("No dividend data could be read");
-      up.sort(function(a,b){return a.d<b.d?-1:a.d>b.d?1:(a.s<b.s?-1:1);});
-      UP=up;HIST=hist;UPDATED=new Date().toISOString();
-      try{localStorage.setItem("psx-div-data",JSON.stringify({up:UP,hist:HIST,meta:META,updated:UPDATED}));}catch(e){}
-      if(UP.length&&!UP.some(function(u){return u.s===sel;}))sel=UP[0].s;
-      showUpdated(UPDATED); renderAll();
-      setMsg("Updated: "+up.length+" upcoming payouts ("+syms.length+" shares checked).");
-      finish();
-    });
-  }).catch(fail);
+      setMsg("Updated to the latest data.");
+    }else setMsg("You already have the latest data.");
+  }).catch(function(){setMsg("Could not load the latest data. Check your internet and try again.",true);}).then(done);
 }
 document.getElementById("updbtn").addEventListener("click",updateNow);
+
+/* ---------- Owner tools (open the page with #owner at the end of the link) ---------- */
+var MON3={jan:1,feb:2,mar:3,apr:4,may:5,jun:6,jul:7,aug:8,sep:9,oct:10,nov:11,dec:12};
+function parsePasted(text){
+  var re=/(?:^|[^A-Za-z0-9])([A-Z0-9][A-Z0-9]{1,9})(?:\s*(?:Shariah|Halal|Islamic|KMI))?[^A-Za-z0-9]{0,12}Rs\.?\s*([\d,]+(?:\.\d+)?)\s*per\s*share\s*X-?\s*Date:?\s*([A-Za-z]{3,9})\.?\s+(\d{1,2}),?\s+(\d{4})/g;
+  var m, seen={}, out=[];
+  while((m=re.exec(text))){
+    var mo=MON3[m[3].slice(0,3).toLowerCase()]; if(!mo)continue;
+    var amt=parseFloat(m[2].replace(/,/g,"")); if(!(amt>0))continue;
+    var d=m[5]+"-"+pad2(mo)+"-"+pad2(+m[4]);
+    if(seen[m[1]]&&seen[m[1]].d<=d)continue;
+    seen[m[1]]={s:m[1],a:Math.round(amt*10000)/10000,d:d};
+  }
+  Object.keys(seen).forEach(function(k){out.push(seen[k]);});
+  return out;
+}
+function ownMsg(t,err){var m=document.getElementById("ownmsg");m.textContent=t;m.className=err?"err":"";}
+function applyPasted(text){
+  var items=parsePasted(text);
+  if(!items.length)throw new Error("No dividends found in the pasted text. Copy the whole page (Ctrl+A, Ctrl+C) on psxterminal.com/dividends.");
+  var today=todayStr(), listed={};
+  items.forEach(function(x){listed[x.s]=1;});
+  UP.forEach(function(u){ // ex-date reached and no longer listed -> keep it in history
+    if(!listed[u.s]&&u.d<=today){
+      var rows=HIST[u.s]=HIST[u.s]||[];
+      if(!rows.some(function(r){return r[0]===u.d;}))rows.unshift([u.d,u.a,"",""]);
+    }
+  });
+  UP=items.map(function(x){var m=META[x.s]||{n:"",k:0};META[x.s]=m;return {s:x.s,n:m.n||"",d:x.d,a:x.a,k:m.k||0};})
+    .sort(function(a,b){return a.d<b.d?-1:a.d>b.d?1:(a.s<b.s?-1:1);});
+  UPDATED=new Date().toISOString();
+  try{localStorage.setItem("psx-div-data",JSON.stringify({up:UP,hist:HIST,meta:META,updated:UPDATED}));}catch(e){}
+  if(!UP.some(function(u){return u.s===sel;}))sel=UP[0].s;
+  showUpdated(UPDATED);renderAll();
+  return UP.length;
+}
+function ghHeaders(t,extra){var h={"Authorization":"Bearer "+t,"Accept":"application/vnd.github+json"};for(var k in (extra||{}))h[k]=extra[k];return h;}
+function publishAll(){
+  var tok=""; try{tok=localStorage.getItem("psx-gh-token")||"";}catch(e){}
+  if(!tok){tok=(window.prompt("Paste your GitHub token (it is kept only in this browser):")||"").trim(); if(!tok)return;}
+  var pb=document.getElementById("pubbtn"); pb.disabled=true; ownMsg("Publishing...");
+  fetch(GH_API,{headers:ghHeaders(tok)}).then(function(r){
+    if(r.status===401||r.status===403||r.status===404){try{localStorage.removeItem("psx-gh-token");}catch(e){} throw new Error("GitHub did not accept the token ("+r.status+"). Create a new one with Contents: Read and write.");}
+    if(!r.ok)throw new Error("GitHub error "+r.status);
+    return r.json();
+  }).then(function(cur){
+    var body=JSON.stringify({up:UP,hist:HIST,meta:META,updated:UPDATED},null,1)+"\n";
+    return fetch(GH_API,{method:"PUT",headers:ghHeaders(tok,{"Content-Type":"application/json"}),
+      body:JSON.stringify({message:"Update dividend data (owner)",branch:"main",sha:cur.sha,content:btoa(unescape(encodeURIComponent(body)))})});
+  }).then(function(r){
+    if(!r.ok)throw new Error("GitHub error "+r.status);
+    try{localStorage.setItem("psx-gh-token",tok);}catch(e){}
+    ownMsg("Published. Everyone (website and phone app) will see it within a minute or two.");
+  }).catch(function(e){ownMsg(e.message||String(e),true);}).then(function(){pb.disabled=false;});
+}
+(function(){
+  if(location.hash!=="#owner")return;
+  document.getElementById("ownertools").hidden=false;
+  document.getElementById("pasteok").addEventListener("click",function(){
+    try{
+      var n=applyPasted(document.getElementById("pastebox").value);
+      ownMsg("Done: "+n+" upcoming dividends loaded. Now press Publish for everyone.");
+      document.getElementById("pubbtn").disabled=false;
+    }catch(e){ownMsg(e.message,true);}
+  });
+  document.getElementById("pubbtn").addEventListener("click",publishAll);
+  document.getElementById("forgettok").addEventListener("click",function(){try{localStorage.removeItem("psx-gh-token");}catch(e){} ownMsg("Token forgotten.");});
+})();
 /* ---------- Install as an app (PWA) ---------- */
 (function(){
   var standalone=(window.matchMedia&&window.matchMedia("(display-mode: standalone)").matches)||window.navigator.standalone===true;
