@@ -1,6 +1,14 @@
 <!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
 <title>PSX Dividend Tracker</title>
 <meta name="claude:viewport-fit-sides" content="cover">
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#0d5c4a">
+<link rel="icon" type="image/png" href="icon-192.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="PSX Dividends">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
 <style>
 /* Layout: summary header, searchable ex-date list on the left, selected share's payout history on the right (stacks on phones). */
@@ -193,7 +201,7 @@ footer a{color:var(--accent)}
       <h1>PSX Dividend Tracker</h1>
       <p class="sub">All upcoming ex-dates in one place. Click any share to see the dividends it has paid before.</p>
     </div>
-    <div><div class="asof" id="asof"></div><div class="updrow"><span id="updmsg"></span><button type="button" class="btn" id="updbtn">⟳ Update now</button></div><div id="updbar" hidden><i></i></div></div>
+    <div><div class="asof" id="asof"></div><div class="updrow"><span id="updmsg"></span><button type="button" class="btn" id="instbtn" hidden>📲 Install app</button><button type="button" class="btn" id="updbtn">⟳ Update now</button></div><div id="iosnote" class="calnote" hidden style="text-align:right">To install on iPhone: tap Share, then &ldquo;Add to Home Screen&rdquo;.</div><div id="updbar" hidden><i></i></div></div>
   </header>
 
   <div class="summary" id="summary"></div>
@@ -592,8 +600,15 @@ function updateNow(){
   var finish=function(){busy=false;btn.disabled=false;btn.textContent="⟳ Update now";setBar(null);};
   var fail=function(e){
     var net=(e&&e.name==="TypeError");
-    setMsg(net?"Could not reach PSX Terminal (internet problem or browser blocked). Please try again.":"Update failed: "+(e&&e.message||e),true);
-    finish();
+    var why=net?"Live source is not reachable from this browser.":"Live update failed: "+(e&&e.message||e);
+    // Fallback: reload the data file published with the site (kept fresh from the owner's PC).
+    fetch("data.json?v="+Date.now(),{cache:"no-store"}).then(function(r){if(!r.ok)throw new Error(r.status);return r.json();}).then(function(j){
+      var pub=Date.parse(j.updated||0), cur=Date.parse(UPDATED||0);
+      if(!UP.length||pub>=cur||!cur){UP=j.up||[];HIST=j.hist||{};META=j.meta||META;UPDATED=j.updated||"";}
+      if(UP.length&&!UP.some(function(u){return u.s===sel;}))sel=UP[0].s;
+      showUpdated(UPDATED);renderAll();
+      setMsg(why+" Showing the latest published data.",true);
+    }).catch(function(){setMsg(why+" Please try again.",true);}).then(finish);
   };
   jget("/symbols").then(function(j){
     var syms=asList(j).map(function(x){return typeof x==="string"?x:(x&&firstOf(x,["symbol","ticker","code","s"]));})
@@ -639,6 +654,22 @@ function updateNow(){
   }).catch(fail);
 }
 document.getElementById("updbtn").addEventListener("click",updateNow);
+/* ---------- Install as an app (PWA) ---------- */
+(function(){
+  var standalone=(window.matchMedia&&window.matchMedia("(display-mode: standalone)").matches)||window.navigator.standalone===true;
+  var dp=null, ib=document.getElementById("instbtn");
+  window.addEventListener("beforeinstallprompt",function(e){e.preventDefault();dp=e;if(!standalone)ib.hidden=false;});
+  ib.addEventListener("click",function(){
+    if(!dp)return; dp.prompt();
+    dp.userChoice.then(function(){dp=null;ib.hidden=true;});
+  });
+  window.addEventListener("appinstalled",function(){ib.hidden=true;});
+  if(!standalone&&/iphone|ipad|ipod/i.test(navigator.userAgent))document.getElementById("iosnote").hidden=false;
+  if("serviceWorker" in navigator&&location.protocol!=="file:"){
+    window.addEventListener("load",function(){navigator.serviceWorker.register("sw.js").catch(function(){});});
+  }
+})();
+
 
 tick();
 setInterval(tick,1000);
