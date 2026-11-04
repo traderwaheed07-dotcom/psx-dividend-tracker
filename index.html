@@ -153,17 +153,40 @@ footer a{color:var(--accent)}
 #updmsg.err{color:var(--warn)}
 #updbar{height:4px;width:100%;background:var(--line);border-radius:4px;overflow:hidden;margin-top:6px}
 #updbar i{display:block;height:100%;width:0;background:var(--accent);transition:width .2s}
+.ticker{position:relative;overflow:hidden;margin:0 0 16px;border-radius:12px;color:#fff;border:1px solid rgba(255,255,255,.15);
+  background:linear-gradient(120deg,#073b30 0%,#0d5c4a 60%,#1a8a6e 100%);box-shadow:0 4px 16px rgba(7,59,48,.25)}
+.ticker-track{display:flex;width:max-content;animation:tickmove var(--dur,120s) linear infinite}
+.ticker:hover .ticker-track,.ticker:focus-within .ticker-track{animation-play-state:paused}
+.ticker-set{display:flex;align-items:center;flex:none}
+.ti{position:relative;white-space:nowrap;padding:12px 26px 12px 20px;font-size:14px;font-family:var(--f-body)}
+.ti::after{content:"\25C6";position:absolute;right:4px;top:50%;transform:translateY(-50%);color:#f5c451;font-size:9px}
+.ti b{font-family:var(--f-mono);font-weight:600}
+.ti .tag2{display:inline-block;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;padding:1px 7px;border-radius:99px;background:rgba(255,255,255,.18);margin-right:8px;color:#f5c451}
+.ti.promo{color:#f5c451;font-weight:600}
+.ti.promo .tag2{background:#f5c451;color:#073b30}
+.ti.hot{background:rgba(245,196,81,.18)}
+.ti.q{font-style:italic;color:#d6efe6}
+.ti a{color:#fff;text-decoration:underline;text-underline-offset:2px}
+.ti.promo a{color:#f5c451}
+@keyframes tickmove{to{transform:translateX(-50%)}}
+@media (prefers-reduced-motion:reduce){.ticker{overflow-x:auto}.ticker-track{animation:none}.ticker-set.dup{display:none}}
+.owner .cta{flex:1 1 100%;margin:0;font-size:14px;color:#e8f6f0;position:relative;z-index:1}
+.owner .cta b{color:#f5c451}
 @media (prefers-reduced-motion:no-preference){.row{transition:background .12s}}
 </style>
 
 <div class="wrap">
+  <div class="ticker" id="ticker" role="region" aria-label="Dividend updates, account opening help and quotes"><div class="ticker-track" id="ttrack"></div></div>
   <div class="owner">
     <div class="badge" aria-hidden="true">WA</div>
     <div class="id"><div class="by">Developed by</div><div class="who">Waheed Ali</div></div>
     <div class="chips">
-      <div class="c"><span>WhatsApp</span><a class="mono" href="https://wa.me/923710245152" target="_blank" rel="noopener">03710245152</a></div>
+      <div class="c"><span>WhatsApp</span><a class="mono" href="https://wa.me/923710245152" target="_blank" rel="noopener">0371-0245152</a></div>
+      <div class="c"><span>Phone</span><a class="mono" href="tel:+923053385715">0305-3385715</a></div>
+      <div class="c"><span>Email</span><a class="mono" href="mailto:waheedalisolangi262@gmail.com">waheedalisolangi262@gmail.com</a></div>
       <div class="c"><span>Email</span><a class="mono" href="mailto:waheed.ali@js.com">waheed.ali@js.com</a></div>
     </div>
+    <p class="cta"><b>Want to open a PSX trading account?</b> Contact Waheed Ali for complete account-opening guidance.</p>
   </div>
   <header>
     <div>
@@ -212,7 +235,7 @@ footer a{color:var(--accent)}
 
 <script>
 /* ---------- Data ---------- */
-// Ex-date (X-date) = pehla trading din jis par share dividend ke baghair trade hota hai.
+// Ex-date = first trading day on which the share trades without the dividend.
 var UP = [], HIST = {}, UPDATED = "";
 
 /* ---------- Helpers ---------- */
@@ -438,7 +461,52 @@ function renderDetail(){
   });
 }
 
-function renderAll(){renderSummary();renderList();renderDetail();}
+
+/* ---------- Top ticker: dividends + account opening guide + quotes ---------- */
+var WA1="https://wa.me/923710245152";
+var INFO=[
+  '<span class="ti promo"><span class="tag2">Account</span>Want to open your PSX account? <a href="'+WA1+'" target="_blank" rel="noopener">Contact Waheed Ali</a></span>',
+  '<span class="ti"><span class="tag2">WhatsApp</span><a href="'+WA1+'" target="_blank" rel="noopener">0371-0245152</a> &nbsp;|&nbsp; <span class="tag2">Phone</span><a href="tel:+923053385715">0305-3385715</a></span>',
+  '<span class="ti"><span class="tag2">Email</span><a href="mailto:waheedalisolangi262@gmail.com">waheedalisolangi262@gmail.com</a> &nbsp;|&nbsp; <a href="mailto:waheed.ali@js.com">waheed.ali@js.com</a></span>',
+  '<span class="ti promo"><span class="tag2">Guide 1</span>Step one: message Waheed Ali on WhatsApp to get started</span>',
+  '<span class="ti promo"><span class="tag2">Guide 2</span>Keep a clear copy of your CNIC (front and back) and a passport-size photo ready</span>',
+  '<span class="ti promo"><span class="tag2">Guide 3</span>Keep your bank account details (IBAN or cancelled cheque) and nominee details handy</span>',
+  '<span class="ti promo"><span class="tag2">Guide 4</span>Once the form and verification are complete, your account goes live. Waheed Ali will guide you throughout</span>',
+  '<span class="ti"><span class="tag2">Note</span>Required documents may vary slightly by broker. Contact us to confirm</span>'
+];
+var QUOTES=[
+  "Patience and discipline are the stock market's best friends.",
+  "Small savings, kept up for years, grow into real wealth.",
+  "A dividend is a garden that keeps bearing fruit over time.",
+  "Investing wisely beats trying to get rich quickly.",
+  "A small start today becomes a big decision tomorrow.",
+  "Time in the market beats timing the market.",
+  "Every great investor was once a beginner. Start today.",
+  "Invest for your own goals, not by watching others."
+];
+var RISK='<span class="ti"><span class="tag2">Note</span>Dividends are decided by each company and profits are not guaranteed. Do your own research before investing</span>';
+function renderTicker(){
+  var tr=document.getElementById("ttrack"); if(!tr)return;
+  var divs=UP.filter(function(u){return daysTo(u.d)>=0;}).sort(function(a,b){return a.d<b.d?-1:a.d>b.d?1:(a.s<b.s?-1:1);}).map(function(u){
+    var n=daysTo(u.d), st=n===0?"TODAY":n===1?"TOMORROW":"";
+    return '<span class="ti'+(n<=1?' hot':'')+'"><span class="tag2">'+(st||"Dividend")+'</span><b>'+esc(u.s)+'</b> '+fmtAmt(u.a)+' &middot; Ex-date '+fmtShort(u.d)+' &middot; Buy by '+fmtShort(lastBuy(u.d))+'</span>';
+  });
+  var out=[INFO[0]], bi=1, qi=0;
+  divs.forEach(function(d,i){
+    out.push(d);
+    if((i+1)%3===0&&bi<INFO.length)out.push(INFO[bi++]);
+    if((i+1)%4===0)out.push('<span class="ti q">&ldquo;'+QUOTES[qi++%QUOTES.length]+'&rdquo;</span>');
+  });
+  while(bi<INFO.length)out.push(INFO[bi++]);
+  var minq=Math.min(3,QUOTES.length);
+  while(qi<minq)out.push('<span class="ti q">&ldquo;'+QUOTES[qi++]+'&rdquo;</span>');
+  out.push(RISK);
+  var set=out.join("");
+  tr.innerHTML='<div class="ticker-set" id="tset">'+set+'</div><div class="ticker-set dup" aria-hidden="true">'+set+'</div>';
+  var w=document.getElementById("tset").offsetWidth||3000;
+  document.getElementById("ticker").style.setProperty("--dur",Math.max(40,Math.round(w/70))+"s");
+}
+function renderAll(){renderSummary();renderList();renderDetail();renderTicker();}
 
 document.getElementById("list").addEventListener("click",function(e){
   var b=e.target.closest(".row");if(!b)return;
@@ -520,18 +588,18 @@ function showUpdated(iso){
 function updateNow(){
   if(busy)return; busy=true;
   var btn=document.getElementById("updbtn"); btn.disabled=true; btn.textContent="Updating...";
-  setMsg("Symbols la raha hun..."); setBar(0);
+  setMsg("Fetching symbols..."); setBar(0);
   var finish=function(){busy=false;btn.disabled=false;btn.textContent="⟳ Update now";setBar(null);};
   var fail=function(e){
     var net=(e&&e.name==="TypeError");
-    setMsg(net?"PSX Terminal se data nahi mil saka (internet ya browser block). Dobara try karein.":"Update nahi ho saka: "+(e&&e.message||e),true);
+    setMsg(net?"Could not reach PSX Terminal (internet problem or browser blocked). Please try again.":"Update failed: "+(e&&e.message||e),true);
     finish();
   };
   jget("/symbols").then(function(j){
     var syms=asList(j).map(function(x){return typeof x==="string"?x:(x&&firstOf(x,["symbol","ticker","code","s"]));})
       .filter(Boolean).map(function(s){return String(s).trim().toUpperCase();});
     syms=syms.filter(function(s,i){return syms.indexOf(s)===i;}).sort();
-    if(syms.length<20)throw new Error("Symbols ki list theek nahi aayi");
+    if(syms.length<20)throw new Error("The symbol list looks wrong");
     var res={}, i=0, done=0, errs=0, stop=false, today=todayStr();
     function worker(){
       if(stop||i>=syms.length)return Promise.resolve();
@@ -539,7 +607,7 @@ function updateNow(){
       return jget("/dividends/"+s).then(function(d){
         res[s]=asList(d).map(parseItem).filter(Boolean);
       }).catch(function(){errs++;}).then(function(){
-        done++; setBar(done/syms.length); setMsg(done+" / "+syms.length+" shares check ho gaye");
+        done++; setBar(done/syms.length); setMsg(done+" / "+syms.length+" shares checked");
         if(done>=15&&errs===done)stop=true;
         return worker();
       });
@@ -547,7 +615,7 @@ function updateNow(){
     var ws=[];for(var k=0;k<8;k++)ws.push(worker());
     return Promise.all(ws).then(function(){
       if(stop)throw new TypeError("blocked");
-      if(errs>syms.length*0.3)throw new Error("Bohot saari requests fail hui ("+errs+"). Thori der baad try karein.");
+      if(errs>syms.length*0.3)throw new Error("Too many requests failed ("+errs+"). Please try again later.");
       var up=[],hist={},parsed=0,meta=META;
       Object.keys(res).sort().forEach(function(s){
         var items=res[s]; parsed+=items.length;
@@ -559,13 +627,13 @@ function updateNow(){
         if(keys.length)hist[s]=keys.map(function(d){return rows[d];});
         if(fut.length){var m=meta[s]||{n:"",k:0};meta[s]=m;up.push({s:s,n:m.n||"",d:fut[0].d,a:fut[0].a,k:m.k||0});}
       });
-      if(!parsed)throw new Error("Koi dividend data parse nahi hua");
+      if(!parsed)throw new Error("No dividend data could be read");
       up.sort(function(a,b){return a.d<b.d?-1:a.d>b.d?1:(a.s<b.s?-1:1);});
       UP=up;HIST=hist;UPDATED=new Date().toISOString();
       try{localStorage.setItem("psx-div-data",JSON.stringify({up:UP,hist:HIST,meta:META,updated:UPDATED}));}catch(e){}
       if(UP.length&&!UP.some(function(u){return u.s===sel;}))sel=UP[0].s;
       showUpdated(UPDATED); renderAll();
-      setMsg("Update ho gaya: "+up.length+" upcoming payouts ("+syms.length+" shares check hue).");
+      setMsg("Updated: "+up.length+" upcoming payouts ("+syms.length+" shares checked).");
       finish();
     });
   }).catch(fail);
@@ -584,7 +652,7 @@ fetch("data.json?v="+Date.now(),{cache:"no-store"}).then(function(r){if(!r.ok)th
   showUpdated(UPDATED);
   renderAll();
 }).catch(function(){
-  document.getElementById("list").innerHTML='<li class="empty">Data load nahi ho saka. Page refresh karein.</li>';
+  document.getElementById("list").innerHTML='<li class="empty">Could not load data. Please refresh the page.</li>';
 });
 </script>
 
