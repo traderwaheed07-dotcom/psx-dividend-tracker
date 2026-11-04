@@ -1,17 +1,15 @@
 #!/usr/bin/env python3
-"""Refresh data.json from the PSX Terminal API.
+"""Refresh data.json from the PSX Terminal API (runs in GitHub Actions).
 
-Runs inside GitHub Actions (daily). For every listed symbol it reads
-GET {BASE}/dividends/{SYMBOL}, then:
-  - payouts with ex-date >= today (Pakistan time)  -> "up"   (upcoming list)
-  - payouts with ex-date <  today                  -> "hist" (past record)
+For every listed symbol it reads GET {BASE}/dividends/{SYMBOL}:
+  - ex-date >= today (Pakistan time) -> "up"   (upcoming list)
+  - ex-date <  today                 -> "hist" (past record, merged with old rows)
+Company name and Shariah flag are kept from the previous data.json ("meta").
 
-Company name and the Shariah flag are kept from the previous data.json
-("meta") because the dividends endpoint does not carry them.
-
-Safety: if the API returns nothing usable, the script exits with an error
-and leaves data.json untouched, so the live site never goes blank.
+Safety: if the API is slow, failing or returns nothing usable, the script exits
+with an error and leaves data.json untouched.
 """
+import concurrent.futures as cf
 import datetime as dt
 import json
 import os
@@ -21,27 +19,42 @@ import urllib.error
 import urllib.request
 
 BASE = os.environ.get("PSX_API_BASE", "https://psxterminal.com/api").rstrip("/")
-DELAY = float(os.environ.get("PSX_DELAY", "0.25"))
+WORKERS = int(os.environ.get("PSX_WORKERS", "6"))
+DELAY = float(os.environ.get("PSX_DELAY", "0.1"))
+TIMEOUT = float(os.environ.get("PSX_TIMEOUT", "15"))
+BUDGET = float(os.environ.get("PSX_BUDGET", "600"))  # max seconds for all symbols
 DEBUG_SYMBOL = os.environ.get("PSX_DEBUG_SYMBOL", "MARI")
 HERE = os.path.dirname(os.path.abspath(__file__))
 DATA = os.path.join(HERE, "..", "data.json")
 UA = "psx-dividend-tracker/1.0 (+GitHub Actions)"
 PKT = dt.timezone(dt.timedelta(hours=5))
 
+try:
+    sys.stdout.reconfigure(line_buffering=True)  # show log lines immediately in Actions
+except Exception:
+    pass
 
-def get_json(path, retries=3):
+
+def log(*a):
+    print(*a, flush=True)
+
+
+def get_json(path, retries=2):
     url = BASE + path
     last = None
     for i in range(retries):
         try:
             req = urllib.request.Request(url, headers={"User-Agent": UA, "Accept": "application/json"})
-            with urllib.request.urlopen(req, timeout=30) as r:
+            with urllib.request.urlopen(req, timeout=TIMEOUT) as r:
                 return json.loads(r.read().decode("utf-8"))
         except urllib.error.HTTPError as e:
             if e.code == 404:
                 return None  # symbol has no dividend data
             last = e
-        except Exception as e:  # network hiccup, bad JSON
+            if e.code == 429:
+                time.sleep(5 * (i + 1))  # rate limited, back off
+                continue
+        except Exception as e:  # timeout, network hiccup, bad JSON
             last = e
         time.sleep(1.5 * (i + 1))
     raise RuntimeError("GET %s failed: %s" % (url, last))
@@ -115,13 +128,29 @@ def symbol_list():
     j = get_json("/symbols")
     out = []
     for x in as_list(j):
-        s = x if isinstance(x, str) else first(x, ["symbol", "ticker", "code", "s"]) if isinstance(x, dict) else None
+        if isinstance(x, str):
+            s = x
+        elif isinstance(x, dict):
+            s = first(x, ["symbol", "ticker", "code", "s"])
+        else:
+            s = None
         if s:
             out.append(str(s).strip().upper())
     return sorted(set(out))
 
 
+def fetch_symbol(sym):
+    try:
+        items = [p for p in (parse_item(x) for x in as_list(get_json("/dividends/" + sym))) if p]
+        return sym, items, None
+    except Exception as e:
+        return sym, [], str(e)
+    finally:
+        time.sleep(DELAY)
+
+
 def main():
+    started = time.time()
     today = dt.datetime.now(PKT).strftime("%Y-%m-%d")
     try:
         old = json.load(open(DATA, encoding="utf-8"))
@@ -130,34 +159,47 @@ def main():
     meta = old.get("meta", {})
     old_hist = old.get("hist", {})
 
-    # Print one raw response so the format is visible in the Actions log.
     try:
-        print("Sample /dividends/%s response:" % DEBUG_SYMBOL, json.dumps(get_json("/dividends/" + DEBUG_SYMBOL))[:800])
+        log("Sample /dividends/%s response:" % DEBUG_SYMBOL, json.dumps(get_json("/dividends/" + DEBUG_SYMBOL))[:800])
     except Exception as e:
-        print("Sample fetch failed:", e)
+        log("Sample fetch failed:", e)
 
     symbols = symbol_list()
-    print("Symbols:", len(symbols))
+    log("Symbols:", len(symbols))
     if len(symbols) < 50:
         sys.exit("Symbol list looks wrong (%d). data.json left unchanged." % len(symbols))
 
-    up, hist, errors, parsed = [], {}, 0, 0
-    for i, sym in enumerate(symbols):
-        try:
-            items = [p for p in (parse_item(x) for x in as_list(get_json("/dividends/" + sym))) if p]
-        except Exception as e:
-            errors += 1
-            print("  error", sym, e)
-            continue
-        finally:
-            time.sleep(DELAY)
+    results, errors = {}, 0
+    ex = cf.ThreadPoolExecutor(max_workers=WORKERS)
+    futs = [ex.submit(fetch_symbol, s) for s in symbols]
+    try:
+        for n, f in enumerate(cf.as_completed(futs, timeout=BUDGET), 1):
+            sym, items, err = f.result()
+            if err:
+                errors += 1
+                if errors <= 10:
+                    log("  error", sym, err)
+            results[sym] = items
+            if n % 50 == 0:
+                log("  %d/%d done (%d errors, %ds)" % (n, len(symbols), errors, time.time() - started))
+            if n >= 30 and errors == n:
+                ex.shutdown(wait=False, cancel_futures=True)
+                sys.exit("First %d requests all failed - API unreachable or blocked. data.json left unchanged." % n)
+    except cf.TimeoutError:
+        ex.shutdown(wait=False, cancel_futures=True)
+        sys.exit("Time budget (%ds) exceeded after %d/%d symbols. data.json left unchanged." % (BUDGET, len(results), len(symbols)))
+    ex.shutdown(wait=True)
+
+    up, hist, parsed = [], {}, 0
+    for sym in sorted(results):
+        items = results[sym]
         parsed += len(items)
         future = sorted([p for p in items if p[0] >= today])
-        past = sorted([p for p in items if p[0] < today], reverse=True)[:40]
+        past = [p for p in items if p[0] < today]
         if future:
-            ex, amt, _, _ = future[0]
+            ex_d, amt, _, _ = future[0]
             m = meta.get(sym, {})
-            up.append({"s": sym, "n": m.get("n", ""), "d": ex, "a": amt, "k": m.get("k", 0)})
+            up.append({"s": sym, "n": m.get("n", ""), "d": ex_d, "a": amt, "k": m.get("k", 0)})
             meta.setdefault(sym, {"n": "", "k": 0})
         # Merge by ex-date: API rows win, older hand-sourced rows (with record/pay dates) are kept.
         rows = {p[0]: [p[0], p[1], p[2], p[3]] for p in past}
@@ -166,10 +208,8 @@ def main():
                 rows[r[0]] = r
         if rows:
             hist[sym] = sorted(rows.values(), key=lambda r: r[0], reverse=True)[:60]
-        if (i + 1) % 100 == 0:
-            print("  %d/%d done" % (i + 1, len(symbols)))
 
-    print("Parsed payouts: %d, upcoming: %d, errors: %d" % (parsed, len(up), errors))
+    log("Parsed payouts: %d, upcoming: %d, errors: %d, time: %ds" % (parsed, len(up), errors, time.time() - started))
     if parsed == 0:
         sys.exit("No usable payout rows parsed (API format changed?). data.json left unchanged.")
     if errors > len(symbols) * 0.3:
@@ -178,13 +218,13 @@ def main():
     up.sort(key=lambda u: (u["d"], u["s"]))
     new = {"up": up, "hist": hist, "meta": meta}
     if all(old.get(k) == new[k] for k in new):
-        print("No changes.")
+        log("No changes.")
         return
     new["updated"] = dt.datetime.now(PKT).isoformat(timespec="minutes")
     with open(DATA, "w", encoding="utf-8") as f:
         json.dump(new, f, indent=1, ensure_ascii=False)
         f.write("\n")
-    print("data.json updated.")
+    log("data.json updated.")
 
 
 if __name__ == "__main__":
