@@ -190,10 +190,89 @@ footer a{color:var(--accent)}
 .mtabs button[aria-pressed=true]{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
 .levsec{margin-bottom:20px}.levsec h3{margin:0 0 8px;font-family:var(--f-display);font-size:18px}
 .levsec tr.tot td{font-weight:600;background:var(--accent-soft)}
-td.lu{color:#b3261e}td.ld{color:var(--accent)}
-@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) td.lu{color:#ff8a80}}
-:root[data-theme="dark"] td.lu{color:#ff8a80}
+td.lu{color:var(--accent)}td.ld{color:#b3261e}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) td.ld{color:#ff8a80}}
+:root[data-theme="dark"] td.ld{color:#ff8a80}
 #levmsg{font-size:13px;color:var(--accent)}#levmsg.err{color:var(--warn)}
+/* ---------- Smooth polish ---------- */
+html{scroll-behavior:smooth;-webkit-text-size-adjust:100%}
+body{-webkit-tap-highlight-color:transparent}
+button,.row,a,select,input{touch-action:manipulation}
+.btn,.seg button,.mtabs button,.row,.c,.fact{transition:background-color .18s ease,color .18s ease,transform .12s ease,box-shadow .2s ease,border-color .18s ease,filter .18s ease}
+.btn:hover{filter:brightness(1.08)}
+.btn:active,.mtabs button:active,.seg button:active{transform:scale(.96)}
+.row:active{background:var(--accent-soft)}
+.panel{box-shadow:0 1px 2px rgba(0,0,0,.04),0 8px 22px -14px rgba(0,0,0,.18)}
+.fact:hover{border-color:var(--accent)}
+.mtabs{position:sticky;top:0;z-index:30;padding:8px 0;margin:0 0 14px;background:var(--bg);background:color-mix(in srgb,var(--bg) 86%,transparent);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px)}
+@keyframes pop{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+#divview:not([hidden]),#levview:not([hidden]){animation:pop .3s ease both}
+.tablewrap{-webkit-overflow-scrolling:touch}
+.levsec td:first-child,.levsec th:first-child{position:sticky;left:0;background:var(--surface);z-index:1;box-shadow:1px 0 0 var(--line)}
+.levsec td:first-child{white-space:normal;min-width:78px;max-width:128px;line-height:1.25}
+.levsec tr.tot td:first-child{background:var(--accent-soft)}
+@media (max-width:600px){
+  body{padding-block:14px 40px}
+  .owner{padding:14px;gap:10px 12px;margin-bottom:14px;border-radius:12px}
+  .owner .badge{width:46px;height:46px;font-size:18px}
+  .owner .who{font-size:26px}
+  .owner .by,.owner .tagline{font-size:10px}
+  .owner .chips{display:grid;grid-template-columns:1fr 1fr;gap:6px;width:100%}
+  .owner .c{padding:6px 10px}
+  .owner .c:nth-child(n+3){grid-column:1 / -1}
+  .owner .mono{font-size:13px}
+  .owner .cta{font-size:12.5px;line-height:1.4}
+  header{margin-bottom:14px;gap:10px}
+  header>div:last-child{width:100%}
+  .asof{text-align:left}.asof .clk{font-size:24px}
+  .updrow{justify-content:flex-start}
+  #updmsg{text-align:left;max-width:none}
+  .summary{gap:8px 20px;padding:12px 0}
+  .summary b{font-size:19px}
+}
+@media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}#divview,#levview,.lvline,.lvdot{animation:none!important}.btn,.row,.mtabs button{transition:none}}
+/* ---------- Advanced layer ---------- */
+.ghost2{background:transparent!important;color:var(--muted)!important;border:1px solid var(--line)!important;padding:7px 11px!important;font-size:15px!important}
+.mtabs{display:flex;gap:6px;max-width:460px}
+.mtabs button,.mtabs .tabc{display:inline-flex;align-items:center;justify-content:center;gap:8px;font:inherit;font-weight:600;font-size:14px;padding:9px 16px;border:1px solid var(--line);border-radius:999px;background:var(--surface);color:var(--muted);cursor:pointer;text-decoration:none;transition:background-color .18s,color .18s,transform .12s}
+.mtabs .tabc{background:var(--warn-soft);color:var(--warn);border-color:transparent}
+.mtabs svg{width:19px;height:19px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;flex:none}
+.mtabs button[aria-pressed=true]{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.mtabs button:active,.mtabs .tabc:active{transform:scale(.96)}
+@media (max-width:700px){
+  body{padding-bottom:calc(86px + env(safe-area-inset-bottom,0px))}
+  .mtabs{position:fixed;left:0;right:0;bottom:0;top:auto;z-index:50;max-width:none;margin:0;gap:0;padding:6px 8px calc(6px + env(safe-area-inset-bottom,0px));background:var(--surface);background:color-mix(in srgb,var(--surface) 90%,transparent);-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);border-top:1px solid var(--line)}
+  .mtabs button,.mtabs .tabc{flex:1;flex-direction:column;gap:3px;font-size:11.5px;padding:7px 4px;border:0;border-radius:12px;background:transparent;color:var(--muted)}
+  .mtabs .tabc{color:var(--warn)}
+  .mtabs button[aria-pressed=true]{background:var(--accent-soft);color:var(--accent)}
+}
+.levhero{padding:18px;margin-bottom:16px}
+.lvtop{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:8px 20px}
+.lvnum{font-family:var(--f-display);font-weight:700;font-size:clamp(40px,9vw,60px);line-height:1;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+.lvlbl{color:var(--muted);font-size:13px;margin-bottom:4px}
+.lvchip{display:inline-flex;align-items:center;gap:6px;font-family:var(--f-mono);font-size:14px;font-weight:600;padding:5px 12px;border-radius:999px}
+.lvchip.up{background:var(--accent-soft);color:var(--accent)}.lvchip.dn{background:#fde4e1;color:#b3261e}.lvchip.flat{background:var(--past-soft);color:var(--past)}
+:root[data-theme="dark"] .lvchip.dn{background:#4a1f1b;color:#ff9a90}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .lvchip.dn{background:#4a1f1b;color:#ff9a90}}
+.lvchart{width:100%;height:auto;display:block;margin-top:12px;overflow:visible}
+.lvchart .area{fill:var(--accent);opacity:.12}
+.lvline{fill:none;stroke:var(--accent);stroke-width:3;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:1;stroke-dashoffset:1;animation:draw 1.1s .15s cubic-bezier(.3,.7,.2,1) forwards}
+@keyframes draw{to{stroke-dashoffset:0}}
+.lvdot{fill:var(--surface);stroke:var(--accent);stroke-width:2.5;opacity:0;animation:dotin .3s 1s forwards}
+.lvdot.last{fill:var(--accent);animation-delay:1.2s}
+@keyframes dotin{to{opacity:1}}
+.lvchart text{fill:var(--muted);font-family:var(--f-mono);font-size:11px}
+.lvchart text.v{fill:var(--ink);font-weight:600}
+.lvchart .gl{stroke:var(--line);stroke-width:1;stroke-dasharray:3 4}
+.mix{display:flex;height:12px;border-radius:99px;overflow:hidden;margin:16px 0 10px;background:var(--line)}
+.mix i{display:block;height:100%}
+.mixleg{display:flex;flex-wrap:wrap;gap:6px 22px;font-size:13px;color:var(--muted)}
+.mixleg b{font-family:var(--f-mono);color:var(--ink);font-weight:600}
+.mixleg span::before{content:"";display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:7px;background:var(--c)}
+.levsec td.bar{background:linear-gradient(90deg,var(--accent-soft) var(--w,0%),transparent var(--w,0%))}
+.skel{height:120px;border-radius:10px;margin-bottom:16px;background:linear-gradient(90deg,var(--line) 25%,var(--surface) 50%,var(--line) 75%);background-size:200% 100%;animation:sk 1.3s linear infinite}
+@keyframes sk{to{background-position:-200% 0}}
+@media (prefers-reduced-motion:reduce){.skel{animation:none}.lvline{stroke-dashoffset:0}.lvdot{opacity:1}}
 </style>
 
 <div class="wrap">
@@ -214,10 +293,10 @@ td.lu{color:#b3261e}td.ld{color:var(--accent)}
       <h1>PSX Dividend Tracker</h1>
       <p class="sub">All upcoming ex-dates in one place. Click any share to see the dividends it has paid before.</p>
     </div>
-    <div><div class="asof" id="asof"></div><div class="updrow"><span id="updmsg"></span><button type="button" class="btn" id="instbtn" hidden>📲 Install app</button><button type="button" class="btn" id="updbtn">⟳ Update now</button></div><div id="iosnote" class="calnote" hidden style="text-align:right">To install on iPhone: tap Share, then &ldquo;Add to Home Screen&rdquo;.</div><div id="updbar" hidden><i></i></div></div>
+    <div><div class="asof" id="asof"></div><div class="updrow"><span id="updmsg"></span><button type="button" class="btn" id="instbtn" hidden>📲 Install app</button><button type="button" class="btn ghost2" id="themebtn" aria-label="Switch light or dark theme" title="Light / dark"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M12 4v16" /><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button><button type="button" class="btn" id="updbtn">⟳ Update now</button></div><div id="iosnote" class="calnote" hidden style="text-align:right">To install on iPhone: tap Share, then &ldquo;Add to Home Screen&rdquo;.</div><div id="updbar" hidden><i></i></div></div>
   </header>
 
-  <div class="mtabs" role="group" aria-label="Section"><button type="button" data-t="div" aria-pressed="true">Dividends</button><button type="button" data-t="lev" aria-pressed="false">Leverage</button></div>
+  <nav class="mtabs" role="group" aria-label="Sections"><button type="button" data-t="div" aria-pressed="true"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg><span>Dividends</span></button><button type="button" data-t="lev" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 17l5-6 4 3 8-9"/><path d="M15 5h5v5"/></svg><span>Leverage</span></button><a class="tabc" href="https://wa.me/923710245152" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 19l1.2-3.6A7.5 7.5 0 1 1 9 18z"/></svg><span>Open account</span></a></nav>
   <section class="panel ownertools" id="allowner" hidden>
     <div class="detail">
       <h3 style="margin-top:0">Owner: update everything in one go</h3>
@@ -276,7 +355,7 @@ td.lu{color:#b3261e}td.ld{color:var(--accent)}
         <div class="addform"><button type="button" class="btn" id="levok">Update from pasted text</button><button type="button" class="btn" id="levpub" disabled>Publish for everyone</button><span id="levmsg"></span></div>
       </div>
     </section>
-    <div id="levbody"></div>
+    <div id="levbody"><div class="skel"></div><div class="skel"></div></div>
   </div>
 
   <footer>
@@ -687,21 +766,51 @@ function publishAll(){
 var LEV=null, LEVUPD="";
 function fmtN(n){return n==null?"":Number(n).toLocaleString("en-US");}
 function fmtD(n){if(n==null)return "";return (n>0?"+":"")+Number(n).toLocaleString("en-US");}
-function levRow(r,tot,hasRel){
+function levRow(r,tot,hasRel,mx){
   var last=r.v[r.v.length-1], ch=r.t-last, cls=ch>0?"lu":(ch<0?"ld":"");
-  var h='<tr'+(tot?' class="tot"':'')+'><td>'+esc(r.n)+'</td>';
+  var h='<tr'+(tot?' class="tot"':'')+'><td>'+esc(r.n)+'</td><td class="r'+(mx?' bar" style="--w:'+Math.round(r.t/mx*100)+'%':'')+'"><b>'+fmtN(r.t)+'</b></td><td class="r '+cls+'">'+fmtD(ch)+'</td>';
   r.v.forEach(function(x){h+='<td class="r">'+fmtN(x)+'</td>';});
   if(hasRel)h+='<td class="r">'+(r.rel==null?"":fmtN(r.rel))+'</td><td class="r">'+(r.nw==null?"":fmtN(r.nw))+'</td>';
-  return h+'<td class="r"><b>'+fmtN(r.t)+'</b></td><td class="r '+cls+'">'+fmtD(ch)+'</td></tr>';
+  return h+'</tr>';
 }
 function levTable(title,rows,hasRel,tot){
   if(!rows||!rows.length)return "";
   var ds=(LEV.dates||[]), h='<section class="panel levsec"><div class="detail"><h3>'+title+'</h3><div class="tablewrap"><table><thead><tr><th>'+(tot?"Rs mn":"Stock")+'</th>';
+  h+='<th class="r">Open today</th><th class="r">Change</th>';
   for(var i=0;i<rows[0].v.length;i++)h+='<th class="r">'+esc(ds[i]||"")+'</th>';
   if(hasRel)h+='<th class="r">Released yesterday</th><th class="r">New take-up</th>';
-  h+='<th class="r">Open today</th><th class="r">Change</th></tr></thead><tbody>';
-  rows.forEach(function(r,i){h+=levRow(r,tot&&i===rows.length-1,hasRel);});
+  h+='</tr></thead><tbody>';
+  var mx=tot?0:Math.max.apply(null,rows.map(function(r){return r.t;}));
+  rows.forEach(function(r,i){h+=levRow(r,tot&&i===rows.length-1,hasRel,mx);});
   return h+'</tbody></table></div></div></section>';
+}
+function levChart(tot){
+  var vals=tot.v.concat([tot.t]), ds=(LEV.dates||[]).concat(["Today"]), W=600,H=170,pl=14,pr=14,pt=26,pb=28;
+  var mn=Math.min.apply(null,vals), mxv=Math.max.apply(null,vals), pad=(mxv-mn)*.18||1; mn-=pad; mxv+=pad;
+  var pts=vals.map(function(v,i){return [pl+i*(W-pl-pr)/(vals.length-1), pt+(1-(v-mn)/(mxv-mn))*(H-pt-pb)];});
+  var d=pts.map(function(q,i){return (i?"L":"M")+q[0].toFixed(1)+" "+q[1].toFixed(1);}).join(" ");
+  var g='<svg class="lvchart" viewBox="0 0 '+W+' '+H+'" role="img" aria-label="Total leverage over the last days"><line class="gl" x1="'+pl+'" x2="'+(W-pr)+'" y1="'+(H-pb)+'" y2="'+(H-pb)+'"/>'
+    +'<path class="area" d="'+d+' L'+pts[pts.length-1][0].toFixed(1)+" "+(H-pb)+" L"+pts[0][0].toFixed(1)+" "+(H-pb)+' Z"/><path class="lvline" pathLength="1" d="'+d+'"/>';
+  pts.forEach(function(q,i){
+    var last=i===pts.length-1, anchor=i===0?"start":(last?"end":"middle");
+    g+='<circle class="lvdot'+(last?" last":"")+'" cx="'+q[0].toFixed(1)+'" cy="'+q[1].toFixed(1)+'" r="'+(last?6:4.5)+'"/>'
+      +'<text class="'+(last?"v":"")+'" x="'+q[0].toFixed(1)+'" y="'+(q[1]-12).toFixed(1)+'" text-anchor="'+anchor+'">'+fmtN(vals[i])+'</text>'
+      +'<text x="'+q[0].toFixed(1)+'" y="'+(H-8)+'" text-anchor="'+anchor+'">'+esc(ds[i]||"")+'</text>';
+  });
+  return g+'</svg>';
+}
+function levMix(S){
+  var parts=[["MTS",S[0],"var(--accent)"],["MFS",S[1],"#e0a526"],["Futures",S[2],"#7b8f9b"]].filter(function(x){return x[1];});
+  var sum=parts.reduce(function(a,x){return a+x[1].t;},0); if(!sum)return "";
+  var bar='<div class="mix" aria-hidden="true">'+parts.map(function(x){return '<i style="width:'+(x[1].t/sum*100).toFixed(2)+'%;background:'+x[2]+'"></i>';}).join("")+'</div>';
+  var leg='<div class="mixleg">'+parts.map(function(x){return '<span style="--c:'+x[2]+'">'+x[0]+' <b>'+fmtN(x[1].t)+'</b> ('+Math.round(x[1].t/sum*100)+'%)</span>';}).join("")+'</div>';
+  return bar+leg;
+}
+function countUp(el){
+  var to=+el.getAttribute("data-to"); if(!to||(window.matchMedia&&matchMedia("(prefers-reduced-motion: reduce)").matches))return;
+  var t0=null,dur=900; el.textContent="0";
+  function f(ts){if(!t0)t0=ts;var k=Math.min(1,(ts-t0)/dur),e=1-Math.pow(1-k,3);el.textContent=fmtN(Math.round(to*e));if(k<1)requestAnimationFrame(f);}
+  requestAnimationFrame(f);
 }
 function renderLev(){
   var box=document.getElementById("levbody");
@@ -709,13 +818,13 @@ function renderLev(){
   var S=LEV.summary||[], tot=S[S.length-1], h="";
   if(tot){
     var last=tot.v[tot.v.length-1], ch=tot.t-last, pc=last?(ch/last*100):0;
-    h+='<div class="summary"><div><b>'+fmtN(tot.t)+'</b><span>Total leverage today (Rs mn)</span></div><div><b>'+fmtD(ch)+' ('+(ch>0?"+":"")+pc.toFixed(1)+'%)</b><span>Change vs previous day</span></div>';
-    S.slice(0,-1).forEach(function(r){h+='<div><b>'+fmtN(r.t)+'</b><span>'+esc(r.n)+'</span></div>';});
-    h+='</div>';
+    h+='<section class="panel levhero"><div class="lvtop"><div><div class="lvlbl">Total leverage today (Rs mn)</div><div class="lvnum" id="lvnum" data-to="'+tot.t+'">'+fmtN(tot.t)+'</div></div>'
+      +'<span class="lvchip '+(ch>0?"up":(ch<0?"dn":"flat"))+'">'+(ch>0?"▲":(ch<0?"▼":"■"))+' '+fmtD(ch)+' ('+(ch>0?"+":"")+pc.toFixed(1)+'%)</span></div>'+levChart(tot)+levMix(S)+'</section>';
   }
-  h+='<p class="note" style="margin:0 0 16px">PSX leverage summary'+(LEV.date?" for "+esc(LEV.date):"")+'. Rs mn. MTS = Margin Trading System, MFS = Margin Financing System. Source: PSX, NCCPL, JS Research. Red change = position increased, green = decreased.</p>';
+  h+='<p class="note" style="margin:0 0 16px">PSX leverage summary'+(LEV.date?" for "+esc(LEV.date):"")+'. Rs mn. MTS = Margin Trading System, MFS = Margin Financing System. Source: PSX, NCCPL, JS Research. Green (+) = position increased, red (-) = decreased.';
   h+=levTable("Leverage summary",S,true,true)+levTable("Top MTS stocks",LEV.mts,true)+levTable("Top MFS stocks",LEV.mfs,true)+levTable("Top Futures open interest stocks",LEV.fut,false);
   box.innerHTML=h;
+  var n=document.getElementById("lvnum"); if(n&&!document.getElementById("levview").hidden)countUp(n);
 }
 function loadLev(manual){
   return fetch("leverage.json?v="+Date.now(),{cache:"no-store"}).then(function(r){if(!r.ok)throw new Error(r.status);return r.json();}).then(function(j){
@@ -775,7 +884,8 @@ Array.prototype.forEach.call(document.querySelectorAll("[data-t]"),function(b){
     var lev=b.getAttribute("data-t")==="lev";
     Array.prototype.forEach.call(document.querySelectorAll("[data-t]"),function(x){x.setAttribute("aria-pressed",x===b);});
     document.getElementById("divview").hidden=lev;document.getElementById("levview").hidden=!lev;
-    if(lev)loadLev();
+    var tv=document.getElementById(lev?"levview":"divview");window.scrollTo({top:Math.max(0,tv.getBoundingClientRect().top+window.scrollY-14),behavior:"smooth"});
+    if(lev){loadLev();var nn=document.getElementById("lvnum");if(nn)countUp(nn);}
   });
 });
 (function(){
@@ -831,6 +941,18 @@ function pubFile(name,obj,tok){
     if(gotLev)p=p.then(function(){return pubFile("leverage.json",LEV,tok);});
     p.then(function(){try{localStorage.setItem("psx-gh-token",tok);}catch(e){} am("Published. Everyone (website and phone app) will see it within a minute or two.");})
      .catch(function(e){am(e.message||String(e),true);b.disabled=false;});
+  });
+})();
+/* ---------- Theme toggle ---------- */
+(function(){
+  var r=document.documentElement;
+  try{var t=localStorage.getItem("psx-theme");if(t)r.setAttribute("data-theme",t);}catch(e){}
+  var mq=window.matchMedia&&matchMedia("(prefers-color-scheme: dark)");
+  function meta(){var d=r.getAttribute("data-theme")==="dark"||(r.getAttribute("data-theme")!=="light"&&mq&&mq.matches);var m=document.querySelector('meta[name="theme-color"]');if(m)m.setAttribute("content",d?"#0f1715":"#0d5c4a");}
+  meta();
+  document.getElementById("themebtn").addEventListener("click",function(){
+    var dark=r.getAttribute("data-theme")==="dark"||(r.getAttribute("data-theme")!=="light"&&mq&&mq.matches);
+    var n=dark?"light":"dark"; r.setAttribute("data-theme",n); try{localStorage.setItem("psx-theme",n);}catch(e){} meta();
   });
 })();
 /* ---------- Install as an app (PWA) ---------- */
