@@ -183,6 +183,7 @@ footer a{color:var(--accent)}
 .ownertools{margin-bottom:20px}
 .ownertools textarea{width:100%;min-height:110px;font:12px var(--f-mono);padding:10px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--ink);resize:vertical}
 #ownmsg{font-size:13px;color:var(--accent)}#ownmsg.err{color:var(--warn)}
+.owner .tagline{font-size:13px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:#f5c451;margin-top:2px}
 @media (prefers-reduced-motion:no-preference){.row{transition:background .12s}}
 </style>
 
@@ -190,14 +191,14 @@ footer a{color:var(--accent)}
   <div class="ticker" id="ticker" role="region" aria-label="Dividend updates, account opening help and quotes"><div class="ticker-track" id="ttrack"></div></div>
   <div class="owner">
     <div class="badge" aria-hidden="true">WA</div>
-    <div class="id"><div class="by">Developed by</div><div class="who">Waheed Ali</div></div>
+    <div class="id"><div class="by">Developed by</div><div class="who">Waheed Ali</div><div class="tagline">The Smart Trader</div></div>
     <div class="chips">
       <div class="c"><span>WhatsApp</span><a class="mono" href="https://wa.me/923710245152" target="_blank" rel="noopener">0371-0245152</a></div>
       <div class="c"><span>Phone</span><a class="mono" href="tel:+923053385715">0305-3385715</a></div>
       <div class="c"><span>Email</span><a class="mono" href="mailto:waheedalisolangi262@gmail.com">waheedalisolangi262@gmail.com</a></div>
       <div class="c"><span>Email</span><a class="mono" href="mailto:waheed.ali@js.com">waheed.ali@js.com</a></div>
     </div>
-    <p class="cta"><b>Want to open a PSX trading account?</b> Contact Waheed Ali for complete account-opening guidance.</p>
+    <p class="cta"><b>Want to open a PSX trading account?</b> Contact Waheed Ali The Smart Trader on WhatsApp 0371-0245152 for complete account-opening guidance.</p>
   </div>
   <header>
     <div>
@@ -247,7 +248,7 @@ footer a{color:var(--accent)}
   </div>
 
   <footer>
-    <span id="upd"></span>Upcoming ex-dates and amounts come from <a href="https://psxterminal.com/dividends" target="_blank" rel="noopener">PSX Terminal</a> (not affiliated with PSX). Past history builds up as ex-dates pass (FFC and HUBC also keep earlier records from
+    <span id="upd"></span>Upcoming ex-dates and amounts come from <a href="https://psxterminal.com/dividends" target="_blank" rel="noopener">PSX Terminal</a> (not affiliated with PSX). Presented by <b>Waheed Ali The Smart Trader</b>, WhatsApp <a href="https://wa.me/923710245152" target="_blank" rel="noopener">0371-0245152</a>. Past history builds up as ex-dates pass (FFC and HUBC also keep earlier records from
     <a href="https://stockanalysis.com/quote/psx/FFC/dividend" target="_blank" rel="noopener">StockAnalysis</a>). Book closure dates are not in this data. Confirm on the PSX
     <a href="https://dps.psx.com.pk/payouts" target="_blank" rel="noopener">Payouts</a> page before trading. "Last day to buy" is the weekday before the ex-date and does not account for public holidays. Calculator tax rates follow
     <a href="https://bacoconsultants.com/blogs/tax-on-dividend-income-pakistan-2026-section-150-rates" target="_blank" rel="noopener">a 2026 Section 150 summary</a>; your CDC statement shows the actual deduction. This is not investment advice.
@@ -419,7 +420,7 @@ function renderDetail(){
   var u=UP.filter(function(x){return x.s===sel;})[0];
   if(!u){el.innerHTML='<p class="empty">Select a share from the list.</p>';return;}
   var rows=historyFor(u.s), st=statusOf(u.d), lb=lastBuy(u.d);
-  var msg='PSX Dividend: '+u.s+(u.n?' ('+u.n+')':'')+' - '+fmtAmt(u.a)+' per share. Ex-date: '+fmtDate(u.d)+'. Last day to buy: '+fmtShort(lb)+'. Via PSX Dividend Tracker by Waheed Ali.';
+  var msg='PSX Dividend: '+u.s+(u.n?' ('+u.n+')':'')+' - '+fmtAmt(u.a)+' per share. Ex-date: '+fmtDate(u.d)+'. Last day to buy: '+fmtShort(lb)+'. Via PSX Dividend Tracker by Waheed Ali The Smart Trader (WhatsApp 0371-0245152).';
   var ts=todayStr(), yago=(function(){var t=today();return new Date(t.getFullYear()-1,t.getMonth(),t.getDate());})();
   var past=rows.filter(function(r){return r.d<=ts;});
   var last=past[0];
@@ -486,13 +487,13 @@ function renderDetail(){
 /* ---------- Top ticker: dividends + account opening guide + quotes ---------- */
 var WA1="https://wa.me/923710245152";
 var INFO=[
-  '<span class="ti promo"><span class="tag2">Account</span>Want to open your PSX account? <a href="'+WA1+'" target="_blank" rel="noopener">Contact Waheed Ali</a></span>',
+  '<span class="ti promo"><span class="tag2">Account</span>Want to open your PSX account? <a href="'+WA1+'" target="_blank" rel="noopener">Contact Waheed Ali The Smart Trader: 0371-0245152</a></span>',
   '<span class="ti"><span class="tag2">WhatsApp</span><a href="'+WA1+'" target="_blank" rel="noopener">0371-0245152</a> &nbsp;|&nbsp; <span class="tag2">Phone</span><a href="tel:+923053385715">0305-3385715</a></span>',
   '<span class="ti"><span class="tag2">Email</span><a href="mailto:waheedalisolangi262@gmail.com">waheedalisolangi262@gmail.com</a> &nbsp;|&nbsp; <a href="mailto:waheed.ali@js.com">waheed.ali@js.com</a></span>',
-  '<span class="ti promo"><span class="tag2">Guide 1</span>Step one: message Waheed Ali on WhatsApp to get started</span>',
+  '<span class="ti promo"><span class="tag2">Guide 1</span>Step one: message Waheed Ali The Smart Trader on WhatsApp 0371-0245152 to get started</span>',
   '<span class="ti promo"><span class="tag2">Guide 2</span>Keep a clear copy of your CNIC (front and back) and a passport-size photo ready</span>',
   '<span class="ti promo"><span class="tag2">Guide 3</span>Keep your bank account details (IBAN or cancelled cheque) and nominee details handy</span>',
-  '<span class="ti promo"><span class="tag2">Guide 4</span>Once the form and verification are complete, your account goes live. Waheed Ali will guide you throughout</span>',
+  '<span class="ti promo"><span class="tag2">Guide 4</span>Once the form and verification are complete, your account goes live. Waheed Ali The Smart Trader will guide you throughout</span>',
   '<span class="ti"><span class="tag2">Note</span>Required documents may vary slightly by broker. Contact us to confirm</span>'
 ];
 var QUOTES=[
