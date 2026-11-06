@@ -185,6 +185,15 @@ footer a{color:var(--accent)}
 #ownmsg{font-size:13px;color:var(--accent)}#ownmsg.err{color:var(--warn)}
 .owner .tagline{font-size:13px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:#f5c451;margin-top:2px}
 @media (prefers-reduced-motion:no-preference){.row{transition:background .12s}}
+.mtabs{display:flex;gap:8px;margin:0 0 18px}
+.mtabs button{font:inherit;font-weight:600;font-size:14px;padding:9px 18px;border:1px solid var(--line);border-radius:999px;background:var(--surface);color:var(--muted);cursor:pointer}
+.mtabs button[aria-pressed=true]{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.levsec{margin-bottom:20px}.levsec h3{margin:0 0 8px;font-family:var(--f-display);font-size:18px}
+.levsec tr.tot td{font-weight:600;background:var(--accent-soft)}
+td.lu{color:#b3261e}td.ld{color:var(--accent)}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) td.lu{color:#ff8a80}}
+:root[data-theme="dark"] td.lu{color:#ff8a80}
+#levmsg{font-size:13px;color:var(--accent)}#levmsg.err{color:var(--warn)}
 </style>
 
 <div class="wrap">
@@ -208,6 +217,8 @@ footer a{color:var(--accent)}
     <div><div class="asof" id="asof"></div><div class="updrow"><span id="updmsg"></span><button type="button" class="btn" id="instbtn" hidden>📲 Install app</button><button type="button" class="btn" id="updbtn">⟳ Update now</button></div><div id="iosnote" class="calnote" hidden style="text-align:right">To install on iPhone: tap Share, then &ldquo;Add to Home Screen&rdquo;.</div><div id="updbar" hidden><i></i></div></div>
   </header>
 
+  <div class="mtabs" role="group" aria-label="Section"><button type="button" data-t="div" aria-pressed="true">Dividends</button><button type="button" data-t="lev" aria-pressed="false">Leverage</button></div>
+  <div id="divview">
   <div class="summary" id="summary"></div>
 
   <section class="panel ownertools" id="ownertools" hidden>
@@ -245,6 +256,19 @@ footer a{color:var(--accent)}
     </section>
 
     <section class="panel detail" id="detail" aria-live="polite"></section>
+  </div>
+  </div>
+
+  <div id="levview" hidden>
+    <section class="panel ownertools" id="levowner" hidden>
+      <div class="detail">
+        <h3 style="margin-top:0">Owner: update the leverage report</h3>
+        <p class="note" style="margin-top:0">1. Open the PSX leverage summary (PDF or email), press Ctrl+A then Ctrl+C. 2. Paste it below. 3. Press &ldquo;Update from pasted text&rdquo;, then &ldquo;Publish for everyone&rdquo;.</p>
+        <textarea id="levpaste" placeholder="Paste the copied report text here"></textarea>
+        <div class="addform"><button type="button" class="btn" id="levok">Update from pasted text</button><button type="button" class="btn" id="levpub" disabled>Publish for everyone</button><span id="levmsg"></span></div>
+      </div>
+    </section>
+    <div id="levbody"></div>
   </div>
 
   <footer>
@@ -579,6 +603,7 @@ function updateNow(){
       showUpdated(UPDATED);renderAll();
       setMsg("Updated to the latest data.");
     }else setMsg("You already have the latest data.");
+    loadLev();
   }).catch(function(){setMsg("Could not load the latest data. Check your internet and try again.",true);}).then(done);
 }
 document.getElementById("updbtn").addEventListener("click",updateNow);
@@ -650,6 +675,117 @@ function publishAll(){
   document.getElementById("pubbtn").addEventListener("click",publishAll);
   document.getElementById("forgettok").addEventListener("click",function(){try{localStorage.removeItem("psx-gh-token");}catch(e){} ownMsg("Token forgotten.");});
 })();
+/* ---------- Leverage report ---------- */
+var LEV=null, LEVUPD="";
+function fmtN(n){return n==null?"":Number(n).toLocaleString("en-US");}
+function fmtD(n){if(n==null)return "";return (n>0?"+":"")+Number(n).toLocaleString("en-US");}
+function levRow(r,tot,hasRel){
+  var last=r.v[r.v.length-1], ch=r.t-last, cls=ch>0?"lu":(ch<0?"ld":"");
+  var h='<tr'+(tot?' class="tot"':'')+'><td>'+esc(r.n)+'</td>';
+  r.v.forEach(function(x){h+='<td class="r">'+fmtN(x)+'</td>';});
+  if(hasRel)h+='<td class="r">'+(r.rel==null?"":fmtN(r.rel))+'</td><td class="r">'+(r.nw==null?"":fmtN(r.nw))+'</td>';
+  return h+'<td class="r"><b>'+fmtN(r.t)+'</b></td><td class="r '+cls+'">'+fmtD(ch)+'</td></tr>';
+}
+function levTable(title,rows,hasRel,tot){
+  if(!rows||!rows.length)return "";
+  var ds=(LEV.dates||[]), h='<section class="panel levsec"><div class="detail"><h3>'+title+'</h3><div class="tablewrap"><table><thead><tr><th>'+(tot?"Rs mn":"Stock")+'</th>';
+  for(var i=0;i<rows[0].v.length;i++)h+='<th class="r">'+esc(ds[i]||"")+'</th>';
+  if(hasRel)h+='<th class="r">Released yesterday</th><th class="r">New take-up</th>';
+  h+='<th class="r">Open today</th><th class="r">Change</th></tr></thead><tbody>';
+  rows.forEach(function(r,i){h+=levRow(r,tot&&i===rows.length-1,hasRel);});
+  return h+'</tbody></table></div></div></section>';
+}
+function renderLev(){
+  var box=document.getElementById("levbody");
+  if(!LEV){box.innerHTML='<p class="empty">Leverage report is not loaded yet.</p>';return;}
+  var S=LEV.summary||[], tot=S[S.length-1], h="";
+  if(tot){
+    var last=tot.v[tot.v.length-1], ch=tot.t-last, pc=last?(ch/last*100):0;
+    h+='<div class="summary"><div><b>'+fmtN(tot.t)+'</b><span>Total leverage today (Rs mn)</span></div><div><b>'+fmtD(ch)+' ('+(ch>0?"+":"")+pc.toFixed(1)+'%)</b><span>Change vs previous day</span></div>';
+    S.slice(0,-1).forEach(function(r){h+='<div><b>'+fmtN(r.t)+'</b><span>'+esc(r.n)+'</span></div>';});
+    h+='</div>';
+  }
+  h+='<p class="note" style="margin:0 0 16px">PSX leverage summary'+(LEV.date?" for "+esc(LEV.date):"")+'. Rs mn. MTS = Margin Trading System, MFS = Margin Financing System. Source: PSX, NCCPL, JS Research. Red change = position increased, green = decreased.</p>';
+  h+=levTable("Leverage summary",S,true,true)+levTable("Top MTS stocks",LEV.mts,true)+levTable("Top MFS stocks",LEV.mfs,true)+levTable("Top Futures open interest stocks",LEV.fut,false);
+  box.innerHTML=h;
+}
+function loadLev(manual){
+  return fetch("leverage.json?v="+Date.now(),{cache:"no-store"}).then(function(r){if(!r.ok)throw new Error(r.status);return r.json();}).then(function(j){
+    var cur=LEV&&LEV.updated;
+    if(!LEV||Date.parse(j.updated||0)>Date.parse(cur||0)){LEV=j;}
+    try{var s=JSON.parse(localStorage.getItem("psx-lev-data")||"null");if(s&&s.summary&&Date.parse(s.updated)>Date.parse(LEV.updated||0))LEV=s;}catch(e){}
+    renderLev();
+  }).catch(function(){if(!LEV)renderLev();});
+}
+function parseLev(text){
+  var t=String(text).replace(/ /g," "), MO="(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)";
+  var N="-?\\d[\\d,]*", dts=t.match(new RegExp("\\b\\d{1,2}-"+MO+"\\b","g"))||[];
+  var dm=t.match(/[A-Z][a-z]{2,8}\s+\d{1,2},\s+\d{4}/);
+  var iM=t.search(/Top\s+MTS\s+stocks/i), iF=t.search(/Top\s+MFS\s+stocks/i), iU=t.search(/Top\s+Futures[^\n]*?stocks/i);
+  if(iM<0||iF<0||iU<0||!(iM<iF&&iF<iU))throw new Error("Report not recognised. Copy the whole leverage summary (Ctrl+A, Ctrl+C) including the Top MTS / MFS / Futures sections.");
+  var sumT=t.slice(0,iM), mtsT=t.slice(iM,iF), mfsT=t.slice(iF,iU), futT=t.slice(iU);
+  function nums(str){return str.trim().split(/\s+/).map(function(x){return parseInt(x.replace(/,/g,""),10);});}
+  function row(name,a,withRel){
+    var v=a.slice(0,4); if(withRel)return {n:name,v:v,rel:a[4],nw:a[5],t:a[6]}; return {n:name,v:v,t:a[4]};
+  }
+  function rows(sec,withRel){
+    var k=withRel?7:5, re=new RegExp("(?:^|[^A-Za-z0-9-])([A-Z][A-Z0-9]*(?:-[A-Z0-9]+)?)\\s+((?:"+N+"\\s+){"+(k-1)+"}"+N+")(?![\\d,])","g"), m, out=[];
+    while((m=re.exec(sec)))out.push(row(m[1],nums(m[2]),withRel));
+    return out;
+  }
+  var S=[], m;
+  [["MTS","\\bMTS\\s+",7],["MFS","\\bMFS\\s+",7],["Futures Open Interest","Futures\\s+Open\\s+Interest\\s+",5],["Total Leverage Position","Total\\s+Leverage\\s+Position\\s+",5]].forEach(function(x){
+    m=new RegExp(x[1]+"((?:"+N+"\\s+){"+(x[2]-1)+"}"+N+")(?![\\d,])","i").exec(sumT);
+    if(m)S.push(row(x[0],nums(m[1]),x[2]===7));
+  });
+  if(S.length<4)throw new Error("Could not read the summary table at the top of the report.");
+  var res={date:dm?dm[0]:"",dates:dts.slice(0,4),summary:S,mts:rows(mtsT,true),mfs:rows(mfsT,true),fut:rows(futT,false)};
+  if(!res.mts.length||!res.mfs.length||!res.fut.length)throw new Error("Could not read all stock tables. Copy the full report and try again.");
+  return res;
+}
+function levMsg(t,err){var m=document.getElementById("levmsg");m.textContent=t;m.className=err?"err":"";}
+function publishLev(){
+  var tok=""; try{tok=localStorage.getItem("psx-gh-token")||"";}catch(e){}
+  if(!tok){tok=(window.prompt("Paste your GitHub token (it is kept only in this browser):")||"").trim(); if(!tok)return;}
+  var api=GH_API.replace(/data\.json$/,"leverage.json"), pb=document.getElementById("levpub"); pb.disabled=true; levMsg("Publishing...");
+  fetch(api,{headers:ghHeaders(tok)}).then(function(r){
+    if(r.status===404)return {};
+    if(r.status===401||r.status===403){try{localStorage.removeItem("psx-gh-token");}catch(e){} throw new Error("GitHub did not accept the token ("+r.status+").");}
+    if(!r.ok)throw new Error("GitHub error "+r.status);
+    return r.json();
+  }).then(function(cur){
+    var body=JSON.stringify(LEV,null,1)+"\n", req={message:"Update leverage report (owner)",branch:"main",content:btoa(unescape(encodeURIComponent(body)))};
+    if(cur.sha)req.sha=cur.sha;
+    return fetch(api,{method:"PUT",headers:ghHeaders(tok,{"Content-Type":"application/json"}),body:JSON.stringify(req)});
+  }).then(function(r){
+    if(!r.ok)throw new Error("GitHub error "+r.status);
+    levMsg("Published. Everyone will see it within a minute or two.");
+  }).catch(function(e){levMsg(e.message||String(e),true);}).then(function(){pb.disabled=false;});
+}
+Array.prototype.forEach.call(document.querySelectorAll("[data-t]"),function(b){
+  b.addEventListener("click",function(){
+    var lev=b.getAttribute("data-t")==="lev";
+    Array.prototype.forEach.call(document.querySelectorAll("[data-t]"),function(x){x.setAttribute("aria-pressed",x===b);});
+    document.getElementById("divview").hidden=lev;document.getElementById("levview").hidden=!lev;
+    if(lev)loadLev();
+  });
+});
+(function(){
+  if(location.hash!=="#owner")return;
+  document.getElementById("levowner").hidden=false;
+  document.getElementById("levok").addEventListener("click",function(){
+    try{
+      var r=parseLev(document.getElementById("levpaste").value);
+      r.updated=new Date().toISOString(); LEV=r;
+      try{localStorage.setItem("psx-lev-data",JSON.stringify(r));}catch(e){}
+      renderLev();
+      levMsg("Done: "+r.mts.length+" MTS, "+r.mfs.length+" MFS, "+r.fut.length+" futures rows loaded. Check below, then press Publish for everyone.");
+      document.getElementById("levpub").disabled=false;
+    }catch(e){levMsg(e.message,true);}
+  });
+  document.getElementById("levpub").addEventListener("click",publishLev);
+})();
+loadLev();
 /* ---------- Install as an app (PWA) ---------- */
 (function(){
   var standalone=(window.matchMedia&&window.matchMedia("(display-mode: standalone)").matches)||window.navigator.standalone===true;
