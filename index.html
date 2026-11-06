@@ -218,6 +218,14 @@ td.lu{color:#b3261e}td.ld{color:var(--accent)}
   </header>
 
   <div class="mtabs" role="group" aria-label="Section"><button type="button" data-t="div" aria-pressed="true">Dividends</button><button type="button" data-t="lev" aria-pressed="false">Leverage</button></div>
+  <section class="panel ownertools" id="allowner" hidden>
+    <div class="detail">
+      <h3 style="margin-top:0">Owner: update everything in one go</h3>
+      <p class="note" style="margin-top:0">Copy the dividend page (psxterminal.com/dividends) and the JS leverage report (Ctrl+A, Ctrl+C on each) and paste both here, one after the other. Press &ldquo;Update everything&rdquo;, check the result, then &ldquo;Publish everything&rdquo;. You can also paste just one of them.</p>
+      <textarea id="allpaste" placeholder="Paste the copied text here"></textarea>
+      <div class="addform"><button type="button" class="btn" id="allok">Update everything</button><button type="button" class="btn" id="allpub" disabled>Publish everything</button><span id="allmsg"></span></div>
+    </div>
+  </section>
   <div id="divview">
   <div class="summary" id="summary"></div>
 
@@ -718,9 +726,9 @@ function loadLev(manual){
   }).catch(function(){if(!LEV)renderLev();});
 }
 function parseLev(text){
-  var t=String(text).replace(/ /g," "), MO="(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)";
+  var t=String(text).replace(/ /g," "); var ts=t.search(/PSX\s+leverage\s+summary/i); if(ts>0)t=t.slice(ts); var MO="(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)";
   var N="-?\\d[\\d,]*", dts=t.match(new RegExp("\\b\\d{1,2}-"+MO+"\\b","g"))||[];
-  var dm=t.match(/[A-Z][a-z]{2,8}\s+\d{1,2},\s+\d{4}/);
+  var dm=t.match(/(?:January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{1,2},\s+\d{4}/);
   var iM=t.search(/Top\s+MTS\s+stocks/i), iF=t.search(/Top\s+MFS\s+stocks/i), iU=t.search(/Top\s+Futures[^\n]*?stocks/i);
   if(iM<0||iF<0||iU<0||!(iM<iF&&iF<iU))throw new Error("Report not recognised. Copy the whole leverage summary (Ctrl+A, Ctrl+C) including the Top MTS / MFS / Futures sections.");
   var sumT=t.slice(0,iM), mtsT=t.slice(iM,iF), mfsT=t.slice(iF,iU), futT=t.slice(iU);
@@ -786,6 +794,45 @@ Array.prototype.forEach.call(document.querySelectorAll("[data-t]"),function(b){
   document.getElementById("levpub").addEventListener("click",publishLev);
 })();
 loadLev();
+/* ---------- Update everything (one paste box) ---------- */
+function pubFile(name,obj,tok){
+  var api=GH_API.replace(/data\.json$/,name);
+  return fetch(api,{headers:ghHeaders(tok)}).then(function(r){
+    if(r.status===404)return {};
+    if(r.status===401||r.status===403){try{localStorage.removeItem("psx-gh-token");}catch(e){} throw new Error("GitHub did not accept the token ("+r.status+").");}
+    if(!r.ok)throw new Error("GitHub error "+r.status);
+    return r.json();
+  }).then(function(cur){
+    var req={message:"Update "+name+" (owner)",branch:"main",content:btoa(unescape(encodeURIComponent(JSON.stringify(obj,null,1)+"\n")))};
+    if(cur.sha)req.sha=cur.sha;
+    return fetch(api,{method:"PUT",headers:ghHeaders(tok,{"Content-Type":"application/json"}),body:JSON.stringify(req)});
+  }).then(function(r){if(!r.ok)throw new Error("GitHub error "+r.status+" while saving "+name);});
+}
+(function(){
+  if(location.hash!=="#owner")return;
+  document.getElementById("allowner").hidden=false;
+  var gotDiv=false,gotLev=false;
+  function am(t,err){var m=document.getElementById("allmsg");m.textContent=t;m.className=err?"err":"";}
+  document.getElementById("allok").addEventListener("click",function(){
+    var text=document.getElementById("allpaste").value, ok=[], bad=[];
+    gotDiv=gotLev=false;
+    if(/X-?\s*Date/i.test(text)){try{var n=applyPasted(text);gotDiv=true;ok.push(n+" dividends");}catch(e){bad.push(e.message);}}
+    if(/Top\s+MTS\s+stocks/i.test(text)){try{var r=parseLev(text);r.updated=new Date().toISOString();LEV=r;try{localStorage.setItem("psx-lev-data",JSON.stringify(r));}catch(e){}renderLev();gotLev=true;ok.push("leverage report ("+r.mts.length+"+"+r.mfs.length+"+"+r.fut.length+" stock rows)");}catch(e){bad.push(e.message);}}
+    if(!ok.length&&!bad.length)bad.push("Nothing recognised. Paste the dividend page text and/or the JS leverage report text.");
+    am((ok.length?"Loaded: "+ok.join(" and ")+". Now press Publish everything. ":"")+bad.join(" "),!ok.length||bad.length>0);
+    document.getElementById("allpub").disabled=!(gotDiv||gotLev);
+  });
+  document.getElementById("allpub").addEventListener("click",function(){
+    var tok=""; try{tok=localStorage.getItem("psx-gh-token")||"";}catch(e){}
+    if(!tok){tok=(window.prompt("Paste your GitHub token (it is kept only in this browser):")||"").trim(); if(!tok)return;}
+    var b=this; b.disabled=true; am("Publishing...");
+    var p=Promise.resolve();
+    if(gotDiv)p=p.then(function(){return pubFile("data.json",{up:UP,hist:HIST,meta:META,updated:UPDATED},tok);});
+    if(gotLev)p=p.then(function(){return pubFile("leverage.json",LEV,tok);});
+    p.then(function(){try{localStorage.setItem("psx-gh-token",tok);}catch(e){} am("Published. Everyone (website and phone app) will see it within a minute or two.");})
+     .catch(function(e){am(e.message||String(e),true);b.disabled=false;});
+  });
+})();
 /* ---------- Install as an app (PWA) ---------- */
 (function(){
   var standalone=(window.matchMedia&&window.matchMedia("(display-mode: standalone)").matches)||window.navigator.standalone===true;
